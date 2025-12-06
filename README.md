@@ -4,7 +4,7 @@ SPDX-FileCopyrightText: 2021 The NGI Pointer Secure-Scuttlebutt Team of 2020/202
 SPDX-License-Identifier: CC0-1.0
 -->
 
-# Go-SSB Room
+# Go-SSB Room (Cloudron packaging fork)
 [![REUSE status](https://api.reuse.software/badge/github.com/ssbc/go-ssb-room)](https://api.reuse.software/info/github.com/ssbc/go-ssb-room)
 
 This repository implements the [Room (v1+v2) server spec](https://github.com/ssbc/rooms2), in Go.
