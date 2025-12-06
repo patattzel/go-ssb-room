@@ -46,6 +46,14 @@ For packaging and running this server on [Cloudron](https://cloudron.io), see [d
    ```
 4. Dashboard is on port `3000`; SSB muxrpc on `8008`. Data/keys sync to `./ssb-go-room-secrets`.
 
+### Cloudron install (example)
+- Follow the Cloudron packaging tutorial: https://docs.cloudron.io/packaging/tutorial/
+- Build locally (`cloudron build --set-version 2.0.7-1`) **or** use a published image (e.g. Docker Hub `pathab/go-ssb-room-cloudron:2.0.7-1`), then install:  
+  `cloudron install --image <tag>`
+- After install, create the first admin:  
+  `cloudron exec -- /app/code/insert-user -repo /app/data/ssb-go-room @your-ssb-pubkey`
+- Dashboard is proxied by Cloudron; data lives in `/app/data/ssb-go-room`. The SSB muxrpc port is configured via the `SSB_PORT` tcpPort from the manifest.
+
 ## :wrench: Development
 
 For an in-depth codebase walkthrough, see the [development.md](./docs/development.md) file in the `docs` folder of this repository.
