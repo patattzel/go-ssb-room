@@ -33,6 +33,7 @@ For a description of MuxRPC APIs see https://github.com/ssbc/rooms2
 ## :rocket: Deployment
 
 If you want to deploy a room server yourself, follow our [deployment.md](./docs/deployment.md) docs.
+For packaging and running this server on [Cloudron](https://cloudron.io), see [docs/cloudron.md](./docs/cloudron.md).
 
 ## :wrench: Development
 

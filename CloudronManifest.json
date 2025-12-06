@@ -1,0 +1,27 @@
+{
+  "id": "io.ssbc.go-ssb-room",
+  "title": "SSB Room",
+  "tagline": "Moderated Scuttlebutt room server",
+  "author": "Secure Scuttlebutt Consortium",
+  "description": "A rooms v2 server with HTTP dashboard, invites, and alias management for Secure Scuttlebutt networks.",
+  "version": "2.0.7-1",
+  "healthCheckPath": "/",
+  "httpPort": 3000,
+  "tcpPorts": {
+    "SSB_PORT": {
+      "title": "SSB muxrpc",
+      "description": "TCP port for secret-handshake + muxrpc connections (keep this aligned with invites).",
+      "defaultValue": 8008,
+      "containerPort": 8008,
+      "portCount": 1
+    }
+  },
+  "addons": {
+    "localstorage": {}
+  },
+  "postInstallMessage": "Create your first admin with 'cloudron exec -- /app/code/insert-user -repo /app/data/ssb-go-room @<your-ssb-pubkey>'.",
+  "manifestVersion": 2,
+  "website": "https://github.com/ssbc/go-ssb-room",
+  "changelog": "https://github.com/ssbc/go-ssb-room/releases",
+  "tags": ["chat", "sync", "hosting"]
+}
