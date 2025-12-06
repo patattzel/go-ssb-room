@@ -35,6 +35,17 @@ For a description of MuxRPC APIs see https://github.com/ssbc/rooms2
 If you want to deploy a room server yourself, follow our [deployment.md](./docs/deployment.md) docs.
 For packaging and running this server on [Cloudron](https://cloudron.io), see [docs/cloudron.md](./docs/cloudron.md).
 
+### Quick start (docker-compose)
+1. Copy `.env_example` to `.env` and set `HTTPS_DOMAIN`.
+2. Build and start: `docker-compose build room && docker-compose up -d`.
+3. Create the first admin inside the running container:
+   ```bash
+   docker-compose exec room sh
+   /app/cmd/insert-user/insert-user -repo /ssb-go-room-secrets @your-ssb-pubkey
+   exit
+   ```
+4. Dashboard is on port `3000`; SSB muxrpc on `8008`. Data/keys sync to `./ssb-go-room-secrets`.
+
 ## :wrench: Development
 
 For an in-depth codebase walkthrough, see the [development.md](./docs/development.md) file in the `docs` folder of this repository.
