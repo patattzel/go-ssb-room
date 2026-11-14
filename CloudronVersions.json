@@ -104,6 +104,58 @@
             "creationDate": "Sat, 14 Nov 2026 20:19:42 GMT",
             "ts": "Sat, 14 Nov 2026 20:19:42 GMT",
             "publishState": "published"
+        },
+        "2.0.7-4": {
+            "manifest": {
+                "id": "io.ssbc.go-ssb-room",
+                "title": "SSB Room",
+                "tagline": "Moderated Scuttlebutt room server",
+                "description": "Host a Scuttlebutt room for Manyverse and other Rooms 2 clients. Manage invitations, members, privacy and aliases in the browser.",
+                "version": "2.0.7-4",
+                "upstreamVersion": "2.0.7",
+                "minBoxVersion": "10.0.0",
+                "healthCheckPath": "/healthz",
+                "httpPort": 3000,
+                "tcpPorts": {
+                    "SSB_PORT": {
+                        "title": "Direct SSB TCP (optional)",
+                        "description": "Enable for TCP-only SSB clients when the room domain resolves directly to Cloudron. Leave disabled to use secure WebSockets over HTTPS port 443, including behind Cloudflare.",
+                        "defaultValue": 8008,
+                        "containerPort": 8008,
+                        "enabledByDefault": false
+                    }
+                },
+                "addons": {
+                    "localstorage": {
+                        "sqlite": {
+                            "paths": [
+                                "/app/data/ssb-go-room/roomdb"
+                            ]
+                        }
+                    }
+                },
+                "postInstallMessage": "1. Open this app’s **Web Terminal** in Cloudron and run `/app/code/room-admin`. Enter your public Manyverse SSB ID in the format `@….ed25519` and choose a web password.\n2. Open the app, choose **Sign in → Password sign-in**, and use the same SSB ID and password.\n3. Open **Invites** in the room dashboard and create your first invite.",
+                "manifestVersion": 2,
+                "website": "https://www.manyver.se/faq/admin-room/",
+                "packageUrl": "https://github.com/patattzel/go-ssb-room",
+                "documentationUrl": "https://github.com/patattzel/go-ssb-room/blob/master/docs/cloudron.md",
+                "packagerName": "patattzel",
+                "packagerUrl": "https://github.com/patattzel",
+                "iconUrl": "https://raw.githubusercontent.com/patattzel/go-ssb-room/cloudron-v2.0.7-2/icon.png",
+                "mediaLinks": [
+                    "https://raw.githubusercontent.com/patattzel/go-ssb-room/cloudron-v2.0.7-2/docs/screenshots/dashboard.png"
+                ],
+                "changelog": "* Default to secure WebSockets over port 443 for new dashboard installations, including behind Cloudflare.\n* Direct SSB TCP remains available as an optional port binding.",
+                "tags": [
+                    "chat",
+                    "sync",
+                    "hosting"
+                ],
+                "dockerImage": "ghcr.io/patattzel/go-ssb-room@sha256:8fb7c73515be9e73bf4051528e7852cf9bd77d5534f672367a6cb78b9cf933dc"
+            },
+            "creationDate": "Sat, 14 Nov 2026 20:41:29 GMT",
+            "ts": "Sat, 14 Nov 2026 20:41:29 GMT",
+            "publishState": "published"
         }
     }
 }
