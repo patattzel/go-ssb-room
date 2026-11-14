@@ -52,6 +52,58 @@
             "creationDate": "Sat, 14 Nov 2026 19:10:49 GMT",
             "ts": "Sat, 14 Nov 2026 19:10:49 GMT",
             "publishState": "published"
+        },
+        "2.0.7-3": {
+            "manifest": {
+                "id": "io.ssbc.go-ssb-room",
+                "title": "SSB Room",
+                "tagline": "Moderated Scuttlebutt room server",
+                "description": "Host a Scuttlebutt room for Manyverse and other Rooms 2 clients. Manage invitations, members, privacy and aliases in the browser.",
+                "version": "2.0.7-3",
+                "upstreamVersion": "2.0.7",
+                "minBoxVersion": "10.0.0",
+                "healthCheckPath": "/healthz",
+                "httpPort": 3000,
+                "tcpPorts": {
+                    "SSB_PORT": {
+                        "title": "SSB connections",
+                        "description": "Public TCP port for Scuttlebutt clients. If disabled, the room uses secure WebSockets on its HTTPS domain.",
+                        "defaultValue": 8008,
+                        "containerPort": 8008,
+                        "enabledByDefault": true
+                    }
+                },
+                "addons": {
+                    "localstorage": {
+                        "sqlite": {
+                            "paths": [
+                                "/app/data/ssb-go-room/roomdb"
+                            ]
+                        }
+                    }
+                },
+                "postInstallMessage": "1. Open this app’s **Web Terminal** in Cloudron and run `/app/code/room-admin`. Enter your public Manyverse SSB ID in the format `@….ed25519` and choose a web password.\n2. Open the app, choose **Sign in → Password sign-in**, and use the same SSB ID and password.\n3. Open **Invites** in the room dashboard and create your first invite.",
+                "manifestVersion": 2,
+                "website": "https://www.manyver.se/faq/admin-room/",
+                "packageUrl": "https://github.com/patattzel/go-ssb-room",
+                "documentationUrl": "https://github.com/patattzel/go-ssb-room/blob/master/docs/cloudron.md",
+                "packagerName": "patattzel",
+                "packagerUrl": "https://github.com/patattzel",
+                "iconUrl": "https://raw.githubusercontent.com/patattzel/go-ssb-room/cloudron-v2.0.7-2/icon.png",
+                "mediaLinks": [
+                    "https://raw.githubusercontent.com/patattzel/go-ssb-room/cloudron-v2.0.7-2/docs/screenshots/dashboard.png"
+                ],
+                "changelog": "* Validate the public Manyverse SSB ID before creating an administrator.\n* Explain how to correct profile links and let operators retry in the same terminal.",
+                "tags": [
+                    "chat",
+                    "sync",
+                    "hosting"
+                ],
+                "dockerImage": "ghcr.io/patattzel/go-ssb-room@sha256:373cae24c9d99d4732883bdff8a369112d7fc3fbd297101f5dcb824b9aed765d"
+            },
+            "creationDate": "Sat, 14 Nov 2026 20:19:42 GMT",
+            "ts": "Sat, 14 Nov 2026 20:19:42 GMT",
+            "publishState": "published"
         }
     }
 }
