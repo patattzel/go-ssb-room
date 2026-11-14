@@ -10,17 +10,17 @@ SPDX-License-Identifier: CC0-1.0
 
 1. In the Cloudron 10+ dashboard, open **App Store → Add custom app → Community app**.
 2. Paste the [SSB Room install URL](https://raw.githubusercontent.com/patattzel/go-ssb-room/master/CloudronVersions.json).
-3. Choose a domain. Keep TCP 8008 enabled for TCP-only SSB clients, choose another free public TCP port, or disable the binding to use secure WebSockets on HTTPS port 443. Allow the chosen TCP port on any external firewall.
+3. Choose a domain. Secure WebSockets over HTTPS port 443 are the default and work behind Cloudflare. For TCP-only clients, enable **Direct SSB TCP**, choose a free public TCP port (suggested 8008), and allow it on any external firewall. Direct TCP requires the room hostname to resolve directly to Cloudron.
 4. Open the deployed room from the Cloudron dashboard. Leave its URL publicly reachable for guests and their Manyverse clients.
 
 For a CLI installation, use the current [Cloudron CLI](https://docs.cloudron.io/packaging/cli/):
 
 ```sh
 cloudron login my.example.com
-cloudron install --location room.example.com --versions-url https://raw.githubusercontent.com/patattzel/go-ssb-room/master/CloudronVersions.json
+cloudron install --location room.example.com --port-bindings SSB_PORT=x --versions-url https://raw.githubusercontent.com/patattzel/go-ssb-room/master/CloudronVersions.json
 ```
 
-The CLI accepts `--port-bindings SSB_PORT=18008` to set a custom port and `--port-bindings SSB_PORT=x` to disable TCP and use WebSockets.
+Pass `--port-bindings SSB_PORT=x` for WebSockets as shown above. To opt into direct TCP instead, pass the desired public port, for example `--port-bindings SSB_PORT=18008`.
 
 Cloudron terminates HTTPS and sends traffic to HTTP port 3000 in the container. It forwards the chosen TCP port to port 8008 inside the container. The room advertises the public endpoint in invitations, aliases and SSB sign-in links. Cloudron checks `/healthz` on the internal HTTP listener.
 
@@ -47,6 +47,8 @@ If you already created an admin for the wrong ID, run `/app/code/room-admin` aga
 Cloudron stores the room identity, SQLite database and web session keys under `/app/data/ssb-go-room`. The localstorage addon includes these in app backups and takes consistent SQLite backups. Restore through Cloudron to retain the room identity and existing membership. Treat these backups as sensitive because they contain the room's private key.
 
 Cloudron receives new versions from the Community App catalog. Review and apply updates in the app's dashboard. For a rollback or restore, use the app's Cloudron backup controls.
+
+To switch an existing TCP installation to WebSockets, open the app's **Location** settings in Cloudron, disable **Direct SSB TCP**, and save. Create fresh invitations for clients that have the old TCP address saved.
 
 For an existing source install with a custom `REPO`, stop the room and move its entire data directory to `/app/data/ssb-go-room` before updating. Remove the `REPO` override so the app and Cloudron's SQLite backup use the same path.
 

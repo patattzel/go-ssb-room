@@ -16,7 +16,7 @@ In the Cloudron 10+ dashboard, open **App Store → Add custom app → Community
 https://raw.githubusercontent.com/patattzel/go-ssb-room/master/CloudronVersions.json
 ```
 
-Choose the room domain and an SSB TCP port. The default is 8008. Disable the TCP port to use secure WebSockets on HTTPS port 443.
+Choose the room domain. New dashboard installations use secure WebSockets over HTTPS port 443, including behind Cloudflare. Enable **Direct SSB TCP** only if you need it for TCP-only clients.
 
 After installation, open the app's **Web Terminal** and run `/app/code/room-admin`. Enter your public Manyverse SSB ID and pick a web password. Open the room site, choose **Sign in → Password sign-in**, and create an invite from the dashboard.
 

@@ -3,18 +3,18 @@
   "title": "SSB Room",
   "tagline": "Moderated Scuttlebutt room server",
   "description": "Host a Scuttlebutt room for Manyverse and other Rooms 2 clients. Manage invitations, members, privacy and aliases in the browser.",
-  "version": "2.0.7-3",
+  "version": "2.0.7-4",
   "upstreamVersion": "2.0.7",
   "minBoxVersion": "10.0.0",
   "healthCheckPath": "/healthz",
   "httpPort": 3000,
   "tcpPorts": {
     "SSB_PORT": {
-      "title": "SSB connections",
-      "description": "Public TCP port for Scuttlebutt clients. If disabled, the room uses secure WebSockets on its HTTPS domain.",
+      "title": "Direct SSB TCP (optional)",
+      "description": "Enable for TCP-only SSB clients when the room domain resolves directly to Cloudron. Leave disabled to use secure WebSockets over HTTPS port 443, including behind Cloudflare.",
       "defaultValue": 8008,
       "containerPort": 8008,
-      "enabledByDefault": true
+      "enabledByDefault": false
     }
   },
   "addons": {
@@ -35,6 +35,6 @@
   "mediaLinks": [
     "https://raw.githubusercontent.com/patattzel/go-ssb-room/cloudron-v2.0.7-2/docs/screenshots/dashboard.png"
   ],
-  "changelog": "* Validate the public Manyverse SSB ID before creating an administrator.\n* Explain how to correct profile links and let operators retry in the same terminal.",
+  "changelog": "* Default to secure WebSockets over port 443 for new dashboard installations, including behind Cloudflare.\n* Direct SSB TCP remains available as an optional port binding.",
   "tags": ["chat", "sync", "hosting"]
 }

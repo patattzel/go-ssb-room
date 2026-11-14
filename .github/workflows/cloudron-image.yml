@@ -46,20 +46,28 @@ jobs:
             --label "org.opencontainers.image.version=${VERSION}" \
             --tag "${IMAGE}:${VERSION}" .
 
-      - name: Verify the image starts with Cloudron settings
+      - name: Verify Cloudron WebSocket and TCP settings
         env:
           VERSION: ${{ steps.version.outputs.tag }}
         run: |
-          docker run -d --name room-test --read-only --tmpfs /tmp --tmpfs /run \
-            --volume room-test:/app/data --publish 127.0.0.1:3000:3000 \
-            --env CLOUDRON=1 --env CLOUDRON_APP_DOMAIN=room.example.com \
-            --env CLOUDRON_PROXY_IP=172.17.0.1 --env SSB_PORT=18008 \
-            "${IMAGE}:${VERSION}"
           trap 'docker logs room-test' EXIT
-          curl --fail --silent --show-error --retry 15 --retry-delay 1 --retry-all-errors \
-            http://127.0.0.1:3000/healthz
-          docker exec room-test test -s /app/data/ssb-go-room/roomdb
-          docker logs room-test 2>&1 | grep -F 'net:room.example.com:18008~shs:'
+          verify_room() {
+            local expected="$1"
+            shift
+            docker run -d --name room-test --read-only --tmpfs /tmp --tmpfs /run \
+              --volume room-test:/app/data --publish 127.0.0.1:3000:3000 \
+              --env CLOUDRON=1 --env CLOUDRON_APP_DOMAIN=room.example.com \
+              --env CLOUDRON_PROXY_IP=172.17.0.1 "$@" "${IMAGE}:${VERSION}"
+            curl --fail --silent --show-error --retry 15 --retry-delay 1 --retry-all-errors \
+              http://127.0.0.1:3000/healthz
+            docker exec room-test test -s /app/data/ssb-go-room/roomdb
+            docker logs room-test 2>&1 | grep -F "$expected"
+          }
+          jq -e '.tcpPorts.SSB_PORT.enabledByDefault == false' CloudronManifest.json
+          verify_room 'wss://room.example.com:443~shs:'
+          docker stop room-test
+          docker rm room-test
+          verify_room 'net:room.example.com:18008~shs:' --env SSB_PORT=18008
 
       - name: Publish image
         env:
