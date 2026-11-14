@@ -3,7 +3,7 @@
   "title": "SSB Room",
   "tagline": "Moderated Scuttlebutt room server",
   "description": "Host a Scuttlebutt room for Manyverse and other Rooms 2 clients. Manage invitations, members, privacy and aliases in the browser.",
-  "version": "2.0.7-2",
+  "version": "2.0.7-3",
   "upstreamVersion": "2.0.7",
   "minBoxVersion": "10.0.0",
   "healthCheckPath": "/healthz",
@@ -24,7 +24,7 @@
       }
     }
   },
-  "postInstallMessage": "1. Open this app’s **Web Terminal** in Cloudron and run `/app/code/room-admin`. Enter your public SSB ID from your Manyverse profile and choose a web password.\n2. Open the app, choose **Sign in → Password sign-in**, and use the same SSB ID and password.\n3. Open **Invites** in the room dashboard and create your first invite.",
+  "postInstallMessage": "1. Open this app’s **Web Terminal** in Cloudron and run `/app/code/room-admin`. Enter your public Manyverse SSB ID in the format `@….ed25519` and choose a web password.\n2. Open the app, choose **Sign in → Password sign-in**, and use the same SSB ID and password.\n3. Open **Invites** in the room dashboard and create your first invite.",
   "manifestVersion": 2,
   "website": "https://www.manyver.se/faq/admin-room/",
   "packageUrl": "https://github.com/patattzel/go-ssb-room",
@@ -35,6 +35,6 @@
   "mediaLinks": [
     "https://raw.githubusercontent.com/patattzel/go-ssb-room/cloudron-v2.0.7-2/docs/screenshots/dashboard.png"
   ],
-  "changelog": "* First Cloudron Community App release.\n* Supports custom SSB ports, secure WebSockets, and Cloudron-managed SQLite backups.\n* Adds guided admin setup and a simpler Manyverse invitation flow.",
+  "changelog": "* Validate the public Manyverse SSB ID before creating an administrator.\n* Explain how to correct profile links and let operators retry in the same terminal.",
   "tags": ["chat", "sync", "hosting"]
 }

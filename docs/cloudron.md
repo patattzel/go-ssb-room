@@ -26,12 +26,14 @@ Cloudron terminates HTTPS and sends traffic to HTTP port 3000 in the container. 
 
 ## Set up the first administrator
 
-1. In Manyverse, copy your public SSB ID from your profile. It starts with `@` and ends with `.ed25519`.
+1. In Manyverse, copy your public SSB ID from your profile. It starts with `@` and ends with `.ed25519`. If you paste a profile link beginning with `ssb:feed/`, the terminal will ask you to enter the ID again.
 2. In Cloudron, open the app's **Web Terminal** and run `/app/code/room-admin`. Paste your SSB ID and enter a new web password twice. The password prompt hides your input. From the Cloudron CLI, the equivalent is `cloudron exec -t --app room.example.com -- /app/code/room-admin`.
 3. On the room site, choose **Sign in → Password sign-in**. Use the same public SSB ID and the web password you just set.
 4. Use **Create invite** on the dashboard and share the single-use link. Guests can open it in Manyverse, paste the HTTPS link in Manyverse under **Connections**, or scan the QR code with another device. Once a peer connects, it appears in the room dashboard.
 
 To recover a web password, run `/app/code/room-admin --reset-password` in the Web Terminal and enter the existing member's ID.
+
+If you already created an admin for the wrong ID, run `/app/code/room-admin` again with the correct ID. Sign in with the new admin and remove the old entry under **Members**.
 
 ## Room settings
 

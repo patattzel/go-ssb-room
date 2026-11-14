@@ -16,10 +16,10 @@ if (( $# > 1 )); then
   exit 1
 fi
 if (( $# == 1 )); then
-  ssb_id="$1"
+  args+=(-- "$1")
 else
-  read -r -p 'Public SSB ID from your Manyverse profile: ' ssb_id
+  args+=(-prompt-id)
 fi
 
 umask 077
-exec gosu cloudron:cloudron /app/code/insert-user "-repo=${REPO:-/app/data/ssb-go-room}" "${args[@]}" -- "${ssb_id}"
+exec gosu cloudron:cloudron /app/code/insert-user "-repo=${REPO:-/app/data/ssb-go-room}" "${args[@]}"
