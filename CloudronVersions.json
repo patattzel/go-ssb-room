@@ -1,0 +1,57 @@
+{
+    "stable": true,
+    "versions": {
+        "2.0.7-2": {
+            "manifest": {
+                "id": "io.ssbc.go-ssb-room",
+                "title": "SSB Room",
+                "tagline": "Moderated Scuttlebutt room server",
+                "description": "Host a Scuttlebutt room for Manyverse and other Rooms 2 clients. Manage invitations, members, privacy and aliases in the browser.",
+                "version": "2.0.7-2",
+                "upstreamVersion": "2.0.7",
+                "minBoxVersion": "10.0.0",
+                "healthCheckPath": "/healthz",
+                "httpPort": 3000,
+                "tcpPorts": {
+                    "SSB_PORT": {
+                        "title": "SSB connections",
+                        "description": "Public TCP port for Scuttlebutt clients. If disabled, the room uses secure WebSockets on its HTTPS domain.",
+                        "defaultValue": 8008,
+                        "containerPort": 8008,
+                        "enabledByDefault": true
+                    }
+                },
+                "addons": {
+                    "localstorage": {
+                        "sqlite": {
+                            "paths": [
+                                "/app/data/ssb-go-room/roomdb"
+                            ]
+                        }
+                    }
+                },
+                "postInstallMessage": "1. Open this app’s **Web Terminal** in Cloudron and run `/app/code/room-admin`. Enter your public SSB ID from your Manyverse profile and choose a web password.\n2. Open the app, choose **Sign in → Password sign-in**, and use the same SSB ID and password.\n3. Open **Invites** in the room dashboard and create your first invite.",
+                "manifestVersion": 2,
+                "website": "https://www.manyver.se/faq/admin-room/",
+                "packageUrl": "https://github.com/patattzel/go-ssb-room",
+                "documentationUrl": "https://github.com/patattzel/go-ssb-room/blob/master/docs/cloudron.md",
+                "packagerName": "patattzel",
+                "packagerUrl": "https://github.com/patattzel",
+                "iconUrl": "https://raw.githubusercontent.com/patattzel/go-ssb-room/cloudron-v2.0.7-2/icon.png",
+                "mediaLinks": [
+                    "https://raw.githubusercontent.com/patattzel/go-ssb-room/cloudron-v2.0.7-2/docs/screenshots/dashboard.png"
+                ],
+                "changelog": "* First Cloudron Community App release.\n* Supports custom SSB ports, secure WebSockets, and Cloudron-managed SQLite backups.\n* Adds guided admin setup and a simpler Manyverse invitation flow.",
+                "tags": [
+                    "chat",
+                    "sync",
+                    "hosting"
+                ],
+                "dockerImage": "ghcr.io/patattzel/go-ssb-room@sha256:8bfccab4ab624b9bcf58ecc5668d566c435a59876cd8340edb78f13c626919d5"
+            },
+            "creationDate": "Sat, 14 Nov 2026 19:10:49 GMT",
+            "ts": "Sat, 14 Nov 2026 19:10:49 GMT",
+            "publishState": "published"
+        }
+    }
+}

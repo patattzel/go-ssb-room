@@ -8,18 +8,15 @@ SPDX-License-Identifier: CC0-1.0
 
 Host a Scuttlebutt Rooms 2 server for Manyverse. Create invitations, manage members and choose who can connect from the room dashboard.
 
-## Install
+## Install on Cloudron
 
-Use a Cloudron 10 or later server and the current [Cloudron CLI](https://docs.cloudron.io/packaging/cli/). Run these commands from your computer.
+In the Cloudron 10+ dashboard, open **App Store → Add custom app → Community app** and paste the [SSB Room install URL](https://raw.githubusercontent.com/patattzel/go-ssb-room/master/CloudronVersions.json).
 
-```sh
-git clone https://github.com/patattzel/go-ssb-room.git
-cd go-ssb-room
-cloudron login my.example.com
-cloudron install --location room.example.com
+```text
+https://raw.githubusercontent.com/patattzel/go-ssb-room/master/CloudronVersions.json
 ```
 
-Cloudron builds the image from the checkout and serves the dashboard over HTTPS. The default public SSB port is TCP 8008. Set a different port at install time with `--port-bindings SSB_PORT=18008`, or use `--port-bindings SSB_PORT=x` to connect through secure WebSockets on port 443.
+Choose the room domain and an SSB TCP port. The default is 8008. Disable the TCP port to use secure WebSockets on HTTPS port 443.
 
 After installation, open the app's **Web Terminal** and run `/app/code/room-admin`. Enter your public Manyverse SSB ID and pick a web password. Open the room site, choose **Sign in → Password sign-in**, and create an invite from the dashboard.
 
