@@ -1,0 +1,168 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The go-ssb-room Cloudron packaging contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+.room-flow {
+  width: min(100%, 36rem);
+  margin: 1.5rem auto;
+}
+
+.room-flow h1,
+.room-dashboard h1 {
+  font-size: clamp(1.65rem, 4vw, 2.125rem);
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.room-flow p {
+  margin-block: .75rem;
+}
+
+.room-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: .45rem .95rem;
+  border: 1px solid #c4b5dc;
+  border-radius: .5rem;
+  background: white;
+  color: #472987;
+  font-weight: 650;
+  text-align: center;
+  cursor: pointer;
+}
+
+.room-action:hover {
+  background: #f3edfc;
+}
+
+.room-action-primary {
+  background: #57349a;
+  border-color: #57349a;
+  color: white;
+}
+
+.room-action-primary:hover {
+  background: #45247f;
+}
+
+.room-action:focus-visible,
+.room-copy input:focus-visible,
+.room-login input:focus-visible,
+.room-flow summary:focus-visible,
+.room-dashboard summary:focus-visible {
+  outline: 2px solid #6938b0;
+  outline-offset: 3px;
+}
+
+.room-flow details,
+.room-dashboard details {
+  border-block-start: 1px solid #ddd6e8;
+  margin-block-start: 1.25rem;
+  padding-block-start: .75rem;
+}
+
+.room-flow summary,
+.room-dashboard summary {
+  width: fit-content;
+  min-height: 2.75rem;
+  cursor: pointer;
+  color: #472987;
+  font-weight: 650;
+}
+
+.room-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: .5rem;
+  margin-block: .75rem;
+}
+
+.room-copy input,
+.room-login input {
+  border: 1px solid #9b91ae;
+  border-radius: .5rem;
+  background: white;
+  padding: .55rem .65rem;
+  min-height: 2.75rem;
+}
+
+.room-copy input {
+  flex: 1 1 16rem;
+  min-width: 0;
+  font-family: ui-monospace, monospace;
+  font-size: .9rem;
+}
+
+.room-copy output {
+  flex-basis: 100%;
+  color: #315940;
+}
+
+.room-copy output:empty {
+  display: none;
+}
+
+.room-login {
+  display: grid;
+  gap: .5rem;
+  max-width: 25rem;
+}
+
+.room-login label {
+  margin-block-start: .5rem;
+  font-weight: 650;
+}
+
+.room-login button {
+  justify-self: start;
+  margin-block: .75rem;
+}
+
+.room-dashboard {
+  margin-block: 1rem;
+}
+
+.room-dashboard-intro {
+  margin-block: 1rem;
+}
+
+.room-dashboard-intro p {
+  margin-block: .5rem;
+  color: #50465e;
+}
+
+.room-dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  margin-block: 1.25rem;
+  gap: .5rem;
+}
+
+.room-dashboard-stats div {
+  border-block-start: 1px solid #ddd6e8;
+  padding-block: .6rem;
+}
+
+.room-dashboard-stats dt {
+  color: #50465e;
+}
+
+.room-dashboard-stats dd {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.room-dashboard-peers {
+  list-style: disc inside;
+  margin-block: .5rem 1rem;
+  overflow-wrap: anywhere;
+}
+
+.room-action[hidden] {
+  display: none;
+}

@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"html/template"
 	"image/color"
+	"mime"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/gorilla/csrf"
 	"github.com/skip2/go-qrcode"
@@ -58,6 +60,7 @@ func (h inviteHandler) buildJoinRoomURI(token string, userAgent string) template
 
 // switch between JSON and HTML responses
 func (h inviteHandler) presentFacade(rw http.ResponseWriter, req *http.Request) {
+	rw.Header().Set("Cache-Control", "no-store")
 	enc := req.URL.Query().Get("encoding")
 	if enc == "json" {
 		h.presentFacadeAsJSON(rw, req)
@@ -121,15 +124,13 @@ func (h inviteHandler) presentFacadeAsHTML(rw http.ResponseWriter, req *http.Req
 	joinRoomURI := h.buildJoinRoomURI(token, req.UserAgent())
 
 	fallbackURL := h.urlTo(router.CompleteInviteFacadeFallback, "token", token)
+	roomTitle := strings.TrimSpace(notice.Title)
+	if roomTitle == "" || (notice.Title == "Description" && notice.Content == "Basic description of this Room.") {
+		roomTitle = h.networkInfo.Domain
+	}
 
 	// generate a QR code with the token inside so that you can open it easily in a supporting mobile app
-	thisURL := req.URL
-	thisURL.Host = h.networkInfo.Domain
-	thisURL.Scheme = "https"
-	if h.networkInfo.Development {
-		thisURL.Scheme = "http"
-		thisURL.Host += fmt.Sprintf(":%d", h.networkInfo.PortHTTPS)
-	}
+	thisURL := h.urlTo(router.CompleteInviteFacade, "token", token)
 	qrCode, err := qrcode.New(thisURL.String(), qrcode.Medium)
 	if err != nil {
 		return nil, err
@@ -146,14 +147,17 @@ func (h inviteHandler) presentFacadeAsHTML(rw http.ResponseWriter, req *http.Req
 
 	return map[string]interface{}{
 		csrf.TemplateTag: csrf.TemplateField(req),
-		"RoomTitle":      notice.Title,
+		"RoomTitle":      roomTitle,
 		"JoinRoomURI":    joinRoomURI,
 		"FallbackURL":    fallbackURL,
+		"ManualURL":      h.urlTo(router.CompleteInviteInsertID, "token", token),
+		"InviteURL":      thisURL.String(),
 		"QRCodeURI":      template.URL(qrURI),
 	}, nil
 }
 
 func (h inviteHandler) presentFacadeFallback(rw http.ResponseWriter, req *http.Request) (interface{}, error) {
+	rw.Header().Set("Cache-Control", "no-store")
 	token := req.URL.Query().Get("token")
 
 	_, err := h.invites.GetByToken(req.Context(), token)
@@ -169,6 +173,7 @@ func (h inviteHandler) presentFacadeFallback(rw http.ResponseWriter, req *http.R
 	return map[string]interface{}{
 		csrf.TemplateTag: csrf.TemplateField(req),
 		"InsertURL":      insertURL,
+		"InviteURL":      h.urlTo(router.CompleteInviteFacade, "token", token).String(),
 	}, nil
 }
 
@@ -203,7 +208,8 @@ func (h inviteHandler) consume(rw http.ResponseWriter, req *http.Request) {
 		resp      inviteConsumeResponder
 	)
 
-	ct := req.Header.Get("Content-Type")
+	rw.Header().Set("Cache-Control", "no-store")
+	ct, _, _ := mime.ParseMediaType(req.Header.Get("Content-Type"))
 	switch ct {
 	case "application/json":
 		resp = newinviteConsumeJSONResponder(rw)
@@ -211,7 +217,7 @@ func (h inviteHandler) consume(rw http.ResponseWriter, req *http.Request) {
 		var body inviteConsumePayload
 
 		level.Debug(logger).Log("event", "handling json body")
-		err := json.NewDecoder(req.Body).Decode(&body)
+		err := json.NewDecoder(http.MaxBytesReader(rw, req.Body, 4096)).Decode(&body)
 		if err != nil {
 			err = fmt.Errorf("consume body contained invalid json: %w", err)
 			resp.SendError(err)
@@ -243,6 +249,11 @@ func (h inviteHandler) consume(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if newMember.Algo() == "" || token == "" {
+		resp.SendError(weberrors.ErrBadRequest{Where: "invite", Details: errors.New("a valid SSB ID and invite token are required")})
+		return
+	}
+
 	// before consuming the invite: check if the invitee is banned
 	if h.deniedKeys.HasFeed(req.Context(), newMember) {
 		resp.SendError(weberrors.ErrDenied)
@@ -264,6 +275,11 @@ func (h inviteHandler) consume(rw http.ResponseWriter, req *http.Request) {
 	level.Info(log).Log("event", "invite consumed", "id", inv.ID, "ref", newMember.ShortSigil())
 
 	resp.SendSuccess()
+}
+
+func isJSON(contentType string) bool {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	return err == nil && mediaType == "application/json"
 }
 
 // inviteConsumeResponder is supposed to handle different encoding types transparently.
@@ -351,15 +367,18 @@ func (html inviteConsumeHTMLResponder) SendError(err error) {
 }
 
 func (h inviteHandler) createOpenMode(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Cache-Control", "no-store")
 	switch r.Header.Get("Accept") {
 	case "application/json":
 		if r.Method != http.MethodPost {
 			h.render.Error(rw, r, http.StatusBadRequest, errors.New("invalid method"))
+			return
 		}
 		h.createOpenModeJSON(rw, r)
 	default:
 		if r.Method != http.MethodGet {
 			h.render.Error(rw, r, http.StatusBadRequest, errors.New("invalid method"))
+			return
 		}
 		h.render.HTML("admin/invite-created.tmpl", h.createOpenModeHTML)(rw, r)
 	}

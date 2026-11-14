@@ -6,7 +6,7 @@ SPDX-License-Identifier: CC0-1.0
 
 ## Development notes
 
-To get started, you need a recent version of [Go](https://golang.org). v1.17 and onward should be sufficient.
+Use [Go 1.26](https://go.dev/dl/) with the latest patch release. The Cloudron image and CI use the same pinned Go version.
 
 Also, if you want to develop the CSS and HTML on the website, you need Node.js v14 in order to compile Tailwind.
 
@@ -19,27 +19,33 @@ go build
 
 Usage of ./server:
   -aliases-as-subdomains
-    	needs to be disabled if a wildcard certificate for the room is not available. (default true)
+        needs to be disabled if a wildcard certificate for the room is not available. (default true)
   -dbg string
-    	listen addr for metrics and pprof HTTP server (default "localhost:6078")
+        listen addr for metrics and pprof HTTP server (default "localhost:6078")
   -https-domain string
-    	which domain to use for TLS and AllowedHosts checks
+        which domain to use for TLS and AllowedHosts checks
   -lishttp string
-    	address to listen on for HTTP requests (default ":3000")
+        address to listen on for HTTP requests (default ":3000")
   -lismux string
-    	address to listen on for secret-handshake+muxrpc (default ":8008")
+        address to listen on for secret-handshake+muxrpc (default ":8008")
   -logs string
-    	where to write debug output to (default is just stderr)
+        where to write debug output to (default is just stderr)
   -mode value
-    	the privacy mode (values: open, community, restricted) determining room access controls
+        the privacy mode (values: open, community, restricted) determining room access controls
   -nounixsock
-    	disable the UNIX socket RPC interface
+        disable the UNIX socket RPC interface
+  -proxy-ip string
+        if set, only trust forwarded headers from this reverse proxy IP
+  -public-mux-port uint
+        public port for TCP SSB addresses (defaults to the listener port)
   -repo string
-    	where to put the log and indexes (default "~/.ssb-go-room")
+        where to put the log and indexes (default "~/.ssb-go-room")
   -shscap string
-    	secret-handshake app-key or capability; should likely not be changed as this makes you part of a different network (default "1KHLiKZvAvjbY1ziZEHMXawbCEIM6qwjCDm3VYRan/s=")
+        secret-handshake app-key or capability; should likely not be changed as this makes you part of a different network (default "1KHLiKZvAvjbY1ziZEHMXawbCEIM6qwjCDm3VYRan/s=")
   -version
-    	print version number and build date
+        print version number and build date
+  -websocket-only
+        offer SSB over the web listener only, without a TCP SSB listener
 
 ```
 
@@ -66,7 +72,7 @@ Once you are done with your changes and want to update the embedded assets to th
 # cd to the root of the folder, and then run go generate
 go generate ./...
 # now build the server without the development mode
-cd cmd/server && go build && ./server -htts-domain=my.room.example
+cd cmd/server && go build && ./server -https-domain=my.room.example
 ```
 
 ## Tooling

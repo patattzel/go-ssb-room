@@ -67,6 +67,13 @@ type noticeShowData struct {
 	Flashes []errors.FlashMessage
 }
 
+func renderNoticeMarkdown(content string) template.HTML {
+	renderer := blackfriday.NewHTMLRenderer(blackfriday.HTMLRendererParameters{
+		Flags: blackfriday.SkipHTML | blackfriday.Safelink,
+	})
+	return template.HTML(blackfriday.Run([]byte(content), blackfriday.WithNoExtensions(), blackfriday.WithRenderer(renderer)))
+}
+
 func (h noticeHandler) show(rw http.ResponseWriter, req *http.Request) (interface{}, error) {
 	noticeID, err := strconv.ParseInt(req.URL.Query().Get("id"), 10, 64)
 	if err != nil {
@@ -78,12 +85,10 @@ func (h noticeHandler) show(rw http.ResponseWriter, req *http.Request) (interfac
 		return nil, err
 	}
 
-	markdown := blackfriday.Run([]byte(notice.Content), blackfriday.WithNoExtensions())
-
 	pageData := noticeShowData{
 		ID:       noticeID,
 		Title:    notice.Title,
-		Content:  template.HTML(markdown),
+		Content:  renderNoticeMarkdown(notice.Content),
 		Language: notice.Language,
 	}
 

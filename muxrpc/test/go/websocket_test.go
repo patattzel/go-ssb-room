@@ -69,7 +69,8 @@ func TestWebsocketDialing(t *testing.T) {
 	wsURL.Path = "/"
 
 	// create a websocket connection
-	conn, resp, err := websocket.DefaultDialer.DialContext(ctx, wsURL.String(), nil)
+	headers := http.Header{"X-Forwarded-For": {"192.0.2.42"}}
+	conn, resp, err := websocket.DefaultDialer.DialContext(ctx, wsURL.String(), headers)
 	r.NoError(err)
 	t.Log(resp.Status)
 	r.Equal(http.StatusSwitchingProtocols, resp.StatusCode)
@@ -112,6 +113,7 @@ func TestWebsocketDialing(t *testing.T) {
 	r.NoError(err)
 	r.Equal("server", meta.Name)
 	r.True(meta.Membership, "not a member?")
+	r.Contains(meta.Features, "room2")
 
 	// open the gossip.ping channel
 	src, snk, err := wsEndpoint.Duplex(ctx, muxrpc.TypeJSON, muxrpc.Method{"gossip", "ping"})

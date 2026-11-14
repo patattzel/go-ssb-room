@@ -2,48 +2,28 @@
 #
 # SPDX-License-Identifier: Unlicense
 
-# Builder
-FROM golang:1.22-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.26.11-bookworm@sha256:dc40a13b61304647ed7e5d581d246b86413dfc29d63c6d018310feb93cd98fc0 AS build
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-      build-essential \
-      ca-certificates \
-      git \
-      gosu \
-      libsqlite3-dev \
-      pkg-config && \
-    rm -rf /var/lib/apt/lists/*
-
+ENV CGO_ENABLED=0 GOTOOLCHAIN=local
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 
-RUN CGO_ENABLED=1 go build -o /build/server ./cmd/server && \
-    CGO_ENABLED=1 go build -o /build/insert-user ./cmd/insert-user
+ARG TARGETOS
+ARG TARGETARCH
+RUN export GOOS="$TARGETOS" GOARCH="$TARGETARCH" && \
+    go build -trimpath -o /build/server ./cmd/server && \
+    go build -trimpath -o /build/insert-user ./cmd/insert-user
 
-# Runtime
-FROM cloudron/base:5.0.0
-
-RUN mkdir -p /app/code /app/data && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-      libsqlite3-0 && \
-    rm -rf /var/lib/apt/lists/* && \
-    chown -R cloudron:cloudron /app
+FROM cloudron/base:6.0.1@sha256:7b1e729960c3ca312d26e886917ba89483241bba0219ff292858e10d9d5768ee
 
 WORKDIR /app/code
 
 COPY --from=build /build/server /app/code/server
 COPY --from=build /build/insert-user /app/code/insert-user
-COPY start.sh /app/code/start.sh
+COPY --chmod=0755 start.sh room-admin /app/code/
 
-RUN chmod +x /app/code/start.sh
-
-USER root
-
-EXPOSE 3000
-EXPOSE 8008
+EXPOSE 3000 8008
 
 CMD ["/app/code/start.sh"]

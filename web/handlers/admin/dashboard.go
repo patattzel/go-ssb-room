@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/csrf"
 	refs "github.com/ssbc/go-ssb-refs"
 	"go.mindeco.de/http/render"
 	"go.mindeco.de/log/level"
@@ -37,7 +38,7 @@ func (h dashboardHandler) overview(w http.ResponseWriter, req *http.Request) (in
 		roomRef = h.netInfo.RoomID.String()
 
 		onlineRefs   []refs.FeedRef
-		refsUpdateCh = make(chan []refs.FeedRef)
+		refsUpdateCh = make(chan []refs.FeedRef, 1)
 		onlineCount  = -1
 	)
 
@@ -96,6 +97,8 @@ func (h dashboardHandler) overview(w http.ResponseWriter, req *http.Request) (in
 		"MemberCount": memberCount,
 		"InviteCount": inviteCount,
 		"DeniedCount": deniedCount,
+		"RoomAddress": h.netInfo.MultiserverAddress(),
+		"csrfField":   csrf.TemplateField(req),
 	}
 
 	pageData["Flashes"], err = h.flashes.GetAll(w, req)

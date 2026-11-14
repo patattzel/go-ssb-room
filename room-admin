@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# SPDX-FileCopyrightText: 2026 The go-ssb-room Cloudron packaging contributors
+#
+# SPDX-License-Identifier: MIT
+
+set -euo pipefail
+
+args=()
+if [[ "${1:-}" == --reset-password ]]; then
+  args+=(-reset-password)
+  shift
+fi
+if (( $# > 1 )); then
+  echo 'Usage: room-admin [--reset-password] [SSB_ID]' >&2
+  exit 1
+fi
+if (( $# == 1 )); then
+  ssb_id="$1"
+else
+  read -r -p 'Public SSB ID from your Manyverse profile: ' ssb_id
+fi
+
+umask 077
+exec gosu cloudron:cloudron /app/code/insert-user "-repo=${REPO:-/app/data/ssb-go-room}" "${args[@]}" -- "${ssb_id}"

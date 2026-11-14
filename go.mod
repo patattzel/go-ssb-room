@@ -15,11 +15,11 @@ require (
 	github.com/friendsofgo/errors v0.9.2
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/gomodule/redigo v2.0.0+incompatible // indirect
-	github.com/gorilla/csrf v1.7.1
+	github.com/gorilla/csrf v1.7.3
 	github.com/gorilla/mux v1.8.0
-	github.com/gorilla/securecookie v1.1.1
+	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.2.1
-	github.com/gorilla/websocket v1.5.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/mattevans/pwned-passwords v0.6.0

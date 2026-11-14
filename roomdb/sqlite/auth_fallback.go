@@ -13,6 +13,7 @@ import (
 	"fmt"
 
 	"github.com/friendsofgo/errors"
+	refs "github.com/ssbc/go-ssb-refs"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 	"go.mindeco.de/http/auth"
@@ -88,34 +89,35 @@ func (af AuthFallback) SetPassword(ctx context.Context, memberID int64, password
 		return fmt.Errorf("auth/fallback: failed to hash password for member")
 	}
 
-	// this is a silly upsert construction which sqlboiler-sqlite doesnt support nativly
 	return transact(af.db, func(tx *sql.Tx) error {
-
-		foundPassword, err := models.FallbackPasswords(qm.Where("member_id = ?", memberID)).One(ctx, tx)
-		if err != nil {
-			if !errors.Is(err, sql.ErrNoRows) {
-				// something else went wrong
-				return err
-			}
-			// not found => insert new entry
-			var newPasswordEntry models.FallbackPassword
-			newPasswordEntry.PasswordHash = hashed
-			newPasswordEntry.MemberID = memberID
-			err = newPasswordEntry.Insert(ctx, tx, boil.Infer())
-			if err != nil {
-				return fmt.Errorf("auth/fallback: failed to insert new user: %w", err)
-			}
-		} else {
-			// found => update the entry
-			foundPassword.PasswordHash = hashed
-			_, err = foundPassword.Update(ctx, tx, boil.Whitelist("password_hash"))
-			if err != nil {
-				return fmt.Errorf("auth/fallback: failed to update password for member: %w", err)
-			}
-		}
-
-		return nil
+		return savePasswordHash(ctx, tx, memberID, hashed)
 	})
+}
+
+// AddMemberWithPassword creates a member and its web credentials in one transaction.
+func (db *Database) AddMemberWithPassword(ctx context.Context, pubKey refs.FeedRef, role roomdb.Role, password string) (int64, error) {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return 0, fmt.Errorf("failed to hash password: %w", err)
+	}
+	var memberID int64
+	err = transact(db.db, func(tx *sql.Tx) error {
+		var err error
+		memberID, err = db.Members.add(ctx, tx, pubKey, role)
+		if err != nil {
+			return err
+		}
+		return savePasswordHash(ctx, tx, memberID, hashed)
+	})
+	return memberID, err
+}
+
+func savePasswordHash(ctx context.Context, tx *sql.Tx, memberID int64, hash []byte) error {
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO fallback_passwords (member_id, password_hash) VALUES (?, ?)
+		ON CONFLICT(member_id) DO UPDATE SET password_hash = excluded.password_hash`,
+		memberID, hash)
+	return err
 }
 
 func (af AuthFallback) SetPasswordWithToken(ctx context.Context, resetToken string, password string) error {

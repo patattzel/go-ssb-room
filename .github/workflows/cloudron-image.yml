@@ -1,0 +1,61 @@
+# SPDX-FileCopyrightText: 2026 The go-ssb-room Cloudron packaging contributors
+#
+# SPDX-License-Identifier: MIT
+
+name: Publish Cloudron image
+
+on:
+  push:
+    tags: ['cloudron-v*']
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate release version
+        id: version
+        run: |
+          version="$(jq -er .version CloudronManifest.json)"
+          test "${GITHUB_REF_NAME}" = "cloudron-v${version}"
+          echo "tag=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build Linux AMD64 image
+        env:
+          VERSION: ${{ steps.version.outputs.tag }}
+        run: |
+          docker build --platform linux/amd64 \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${VERSION}" \
+            --tag "${IMAGE}:${VERSION}" .
+
+      - name: Verify the image starts with Cloudron settings
+        env:
+          VERSION: ${{ steps.version.outputs.tag }}
+        run: |
+          docker run -d --name room-test --read-only --tmpfs /tmp --tmpfs /run \
+            --volume room-test:/app/data --publish 127.0.0.1:3000:3000 \
+            --env CLOUDRON=1 --env CLOUDRON_APP_DOMAIN=room.example.com \
+            --env CLOUDRON_PROXY_IP=172.17.0.1 --env SSB_PORT=18008 \
+            "${IMAGE}:${VERSION}"
+          trap 'docker logs room-test' EXIT
+          curl --fail --silent --show-error --retry 15 --retry-delay 1 --retry-all-errors \
+            http://127.0.0.1:3000/healthz
+          docker exec room-test test -s /app/data/ssb-go-room/roomdb
+          docker logs room-test 2>&1 | grep -F 'net:room.example.com:18008~shs:'
+
+      - name: Publish image
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.tag }}
+        run: |
+          printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+          docker push "${IMAGE}:${VERSION}"

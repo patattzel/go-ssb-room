@@ -16,7 +16,6 @@ import (
 	"strings"
 	"syscall"
 
-	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/ssh/terminal"
 
 	refs "github.com/ssbc/go-ssb-refs"
@@ -30,11 +29,13 @@ func main() {
 	check(err)
 
 	var (
-		role     roomdb.Role = roomdb.RoleAdmin
-		repoPath string
+		role          roomdb.Role = roomdb.RoleAdmin
+		repoPath      string
+		resetPassword bool
 	)
 
 	flag.StringVar(&repoPath, "repo", filepath.Join(u.HomeDir, ".ssb-go-room"), "[optional] where the locally stored files of the room are located")
+	flag.BoolVar(&resetPassword, "reset-password", false, "set a new password for an existing member")
 	flag.Func("role", "[optional] which role the new member should have (values: mod[erator], admin, or member. default is admin)", func(val string) error {
 		switch strings.ToLower(val) {
 		case "admin":
@@ -53,12 +54,8 @@ func main() {
 	})
 	flag.Parse()
 
-	if _, err := os.Stat(repoPath); err != nil {
-		if os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "error: %s does not exist (-repo)?\n", repoPath)
-			os.Exit(1)
-		}
-	}
+	_, err = os.Stat(filepath.Join(repoPath, "roomdb"))
+	check(err)
 
 	// we require one more argument which is not a flag.
 	if len(flag.Args()) != 1 {
@@ -76,24 +73,33 @@ func main() {
 	check(err)
 	defer db.Close()
 
-	fmt.Fprintln(os.Stderr, "Choose a password to be able to log into the web frontend: ")
+	fmt.Fprint(os.Stderr, "Choose a web password (12–72 bytes): ")
 	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+	fmt.Fprintln(os.Stderr)
 	check(err)
 
-	fmt.Fprintln(os.Stderr, "Repeat Password: ")
+	fmt.Fprint(os.Stderr, "Repeat password: ")
 	bytePasswordRepeat, err := terminal.ReadPassword(int(syscall.Stdin))
+	fmt.Fprintln(os.Stderr)
 	check(err)
 
 	if !bytes.Equal(bytePassword, bytePasswordRepeat) {
 		fmt.Fprintln(os.Stderr, "Passwords didn't match")
 		os.Exit(1)
 	}
+	if len(bytePassword) < 12 || len(bytePassword) > 72 {
+		check(fmt.Errorf("password must be 12–72 bytes"))
+	}
 
 	ctx := context.Background()
-	mid, err := db.Members.Add(ctx, pubKey, role)
-	check(err)
-
-	err = db.AuthFallback.SetPassword(ctx, mid, string(bytePassword))
+	if resetPassword {
+		member, err := db.Members.GetByFeed(ctx, pubKey)
+		check(err)
+		check(db.AuthFallback.SetPassword(ctx, member.ID, string(bytePassword)))
+		fmt.Fprintln(os.Stderr, "Updated the member's web password.")
+		return
+	}
+	mid, err := db.AddMemberWithPassword(ctx, pubKey, role, string(bytePassword))
 	check(err)
 
 	fmt.Fprintf(os.Stderr, "Created member (%s) with ID %d\n", role, mid)

@@ -155,7 +155,9 @@ func (h noticeHandler) edit(rw http.ResponseWriter, req *http.Request) (interfac
 	fixedContent := strings.Replace(n.Content, "\r\n", "\n", -1)
 
 	contentBytes := []byte(fixedContent)
-	preview := blackfriday.Run(contentBytes)
+	preview := blackfriday.Run(contentBytes, blackfriday.WithRenderer(blackfriday.NewHTMLRenderer(blackfriday.HTMLRendererParameters{
+		Flags: blackfriday.SkipHTML | blackfriday.Safelink,
+	})))
 
 	pageData := map[string]interface{}{
 		"SubmitAction":   router.AdminNoticeSave,

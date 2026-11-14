@@ -62,8 +62,8 @@ AuthWithSSBError = "Anmeldung fehlgeschlagen. Stelle sicher, dass du eine SSB-Ap
 
 # auth with password
 AuthFallbackTitle = "Mit Passwort anmelden"
-AuthFallbackWelcome = "Eine Anmeldung mit SSB-ID und Passwort ist nur möglich, wenn der Administrator dir einen solchen Zugang gegeben hat."
-AuthFallbackInstruct = "Alternative Anmeldemethode, falls du eine SSB-ID und ein Passwort hast."
+AuthFallbackWelcome = "Melde dich mit deiner öffentlichen SSB-ID aus deinem Manyverse-Profil und dem Web-Passwort für diesen Raum an."
+AuthFallbackInstruct = "Verwende deine SSB-ID und das Web-Passwort für diesen Raum."
 
 AuthFallbackNewPassword="Neues Passwort"
 AuthFallbackRepeatPassword="Passwort wiederholen"
@@ -168,17 +168,17 @@ AdminInviteSuggestedAliasIs = "Der vorgeschlagene Alias ​​lautet:"
 AdminInviteSuggestedAliasIsShort = "Alias:"
 
 AdminInviteCreatedTitle = "Einladung erfolgreich erstellt!"
-AdminInviteCreatedInstruct = "Kopiere nun den folgenden Link und gebe ihn an die Person weiter, welche du zu diesem Raum einladen möchtest."
+AdminInviteCreatedInstruct = "Teile diesen einmalig nutzbaren Link mit einer Person, damit sie über Manyverse beitreten kann."
 
 # public invites
 ################
 
 InviteFacade = "Raum beitreten"
 InviteFacadeTitle = "Raum beitreten"
-InviteFacadeWelcome = "Willkommen bei {{.RoomTitle}}! Mit dieser Einladung kannst du Mitglied dieses Raums werden."
-InviteFacadeInstruct = "Um die Einladung zu verwenden, klicke auf die Schaltfläche unten. Danach öffent sich eine kompatible SSB-App und verbindet dich mit dem Raum."
-InviteFacadeJoin = "Tritt diesem Raum bei"
-InviteFacadeInstructQR = "Falls dich deine SSB-App auf einem anderen Gerät befindet, kannst du damit den folgenden QR-Code scannen:"
+InviteFacadeWelcome = "Du wurdest zu {{.RoomTitle}} eingeladen."
+InviteFacadeInstruct = "Öffne Manyverse auf diesem Gerät, um die Einladung anzunehmen."
+InviteFacadeJoin = "In Manyverse öffnen"
+InviteFacadeInstructQR = "Scanne den QR-Code mit deinem zweiten Gerät, um die Einladung dort zu öffnen."
 
 InviteFacadeFallbackInsertID = "SSB-ID einfügen"
 
@@ -199,8 +199,8 @@ AliasResolutionConnect = "Verbinde dich mit"
 ###############
 
 SSBURIOpening = "SSB App öffnen "
-SSBURIFailureWelcome = "Bist du neu bei SSB? Es scheint, dass du noch keine kompatible SSB-App installiert hast. Du kannst eine dieser Apps installieren: "
-SSBURIFailureInstallManyverse = "Manyverse Installieren"
+SSBURIFailureWelcome = "Falls sich Manyverse nicht geöffnet hat, kopiere den Einladungslink und füge ihn in Manyverse unter Verbindungen ein."
+SSBURIFailureInstallManyverse = "Manyverse herunterladen"
 
 # notices (mini-CMS)
 ####################
@@ -222,6 +222,25 @@ NoticePrivacyPolicy = "Datenschutz-Bestimmungen"
 #   [Label]
 #   one = singular
 #   other = {{.Count}} things
+
+InvitePasteHelp = "Kopiere diesen Link und füge ihn in Manyverse unter Verbindungen ein."
+InviteOtherOptions = "Weitere Möglichkeiten zum Beitritt"
+InviteScan = "Auf einem anderen Gerät scannen"
+InviteQRCode = "QR-Code für diese Einladung"
+InviteManualHelp = "Du kannst die Einladung auch mit deiner öffentlichen SSB-ID annehmen."
+CopyInviteLink = "Einladungslink kopieren"
+CopyRoomAddress = "Raumadresse kopieren"
+CopySuccess = "Kopiert"
+CopyManual = "Link oder Adresse ist markiert. Kopiere den Text mit der Kopierfunktion deines Geräts."
+AdminDashboardInviteHelp = "Erstelle einen einmalig nutzbaren Link für eine Person auf Manyverse."
+AdminDashboardConnection = "Verbindungsdetails"
+AdminDashboardRoomAddress = "Raumadresse"
+AdminDashboardOnline = "Online"
+AdminDashboardOffline = "Es ist noch niemand verbunden."
+AdminDashboardOnlineUnavailable = "Der Verbindungsstatus ist vorübergehend nicht verfügbar."
+AuthSSBID = "SSB-ID oder Raumalias"
+AuthPasswordLabel = "Web-Passwort"
+
 
 [MemberCount]
 description = "Anzahl der Mitglieder"

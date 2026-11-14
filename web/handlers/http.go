@@ -10,11 +10,11 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
-	"github.com/russross/blackfriday/v2"
 	"go.mindeco.de/http/auth"
 	"go.mindeco.de/http/render"
 	"go.mindeco.de/log/level"
@@ -90,8 +90,11 @@ func New(
 	cookieStore := &sessions.CookieStore{
 		Codecs: cookieCodec,
 		Options: &sessions.Options{
-			Path:   "/",
-			MaxAge: 2 * 60 * 60, // two hours in seconds  // TODO: configure
+			Path:     "/",
+			MaxAge:   2 * 60 * 60, // two hours in seconds  // TODO: configure
+			Secure:   !netInfo.Development,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
 		},
 	}
 
@@ -156,7 +159,7 @@ func New(
 						Translation:  entry.Translation,
 						ClassList:    classList,
 					}
-					err = changeLanguageTemplate.Execute(&buf, data)
+					err := changeLanguageTemplate.Execute(&buf, data)
 					if err != nil {
 						return "", fmt.Errorf("Error while executing change language template: %w", err)
 					}
@@ -192,6 +195,8 @@ func New(
 
 	authWithPassword, err := auth.NewHandler(dbs.AuthFallback,
 		auth.SetStore(cookieStore),
+		auth.SetLanding(urlTo(router.AdminDashboard).Path),
+		auth.SetLogout("/"),
 		auth.SetErrorHandler(func(rw http.ResponseWriter, req *http.Request, err error, code int) {
 			eh.Handle(rw, req, code, err)
 		}),
@@ -213,9 +218,8 @@ func New(
 	CSRF := csrf.Protect(csrfKey,
 		csrf.Path("/"),
 		csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			err := csrf.FailureReason(req)
-			// TODO: localize error?
-			r.Error(w, req, http.StatusForbidden, err)
+			level.Debug(logging.FromContext(req.Context())).Log("event", "csrf rejected", "err", csrf.FailureReason(req))
+			eh.Handle(w, req, http.StatusForbidden, weberrs.ErrNotAuthorized)
 		})),
 	)
 
@@ -247,17 +251,19 @@ func New(
 
 	m.Get(router.AuthFallbackFinalize).HandlerFunc(authWithPassword.Authorize)
 	m.Get(router.AuthFallbackLogin).Handler(r.HTML("auth/fallback_sign_in.tmpl", func(w http.ResponseWriter, req *http.Request) (interface{}, error) {
+		w.Header().Set("Cache-Control", "no-store")
 		pageData := map[string]interface{}{
 			csrf.TemplateTag: csrf.TemplateField(req),
 		}
-		pageData["Flashes"], err = flashHelper.GetAll(w, req)
+		flashes, err := flashHelper.GetAll(w, req)
 		if err != nil {
 			return nil, err
 		}
+		pageData["Flashes"] = flashes
 		return pageData, nil
 	}))
 	m.Get(router.AuthLogout).HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		err = authWithSSB.Logout(w, req)
+		err := authWithSSB.Logout(w, req)
 		if err != nil {
 			level.Warn(logging.FromContext(req.Context())).Log("err", err)
 		}
@@ -292,6 +298,11 @@ func New(
 	m.Get(router.CompleteSetLanguage).HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		lang := req.FormValue("lang")
 		previousRoute := req.FormValue("page")
+		if redirectURL, err := url.ParseRequestURI(previousRoute); err != nil ||
+			!strings.HasPrefix(previousRoute, "/") || strings.HasPrefix(previousRoute, "//") ||
+			strings.Contains(previousRoute, "\\") || redirectURL.Host != "" {
+			previousRoute = "/"
+		}
 
 		session, err := cookieStore.Get(req, i18n.LanguageCookieName)
 		if err != nil {
@@ -318,11 +329,11 @@ func New(
 		if err != nil {
 			return nil, fmt.Errorf("failed to find description: %w", err)
 		}
-		markdown := blackfriday.Run([]byte(notice.Content), blackfriday.WithNoExtensions())
+		markdown := renderNoticeMarkdown(notice.Content)
 		return noticeShowData{
 			ID:       notice.ID,
 			Title:    notice.Title,
-			Content:  template.HTML(markdown),
+			Content:  markdown,
 			Language: notice.Language,
 		}, nil
 	}))
@@ -391,7 +402,7 @@ func New(
 		func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				ct := req.Header.Get("Content-Type")
-				if req.URL.Path == consumeURL.Path && ct == "application/json" {
+				if req.URL.Path == consumeURL.Path && isJSON(ct) {
 					next.ServeHTTP(w, csrf.UnsafeSkipCheck(req))
 					return
 				}

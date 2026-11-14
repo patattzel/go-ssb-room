@@ -10,10 +10,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/ssbc/go-muxrpc/v2"
 	kitlog "go.mindeco.de/log"
 	"go.mindeco.de/log/level"
 )
@@ -59,71 +59,38 @@ type websocketHandelr struct {
 }
 
 func (wsh websocketHandelr) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	remoteAddrStr := req.Header.Get("X-Forwarded-For")
-	if remoteAddrStr == "" {
-		remoteAddrStr = req.RemoteAddr
-	}
-
-	remoteAddr, err := net.ResolveTCPAddr("tcp", remoteAddrStr)
-	if err != nil {
+	if !websocket.IsWebSocketUpgrade(req) {
 		wsh.next.ServeHTTP(w, req)
 		return
+	}
+
+	remoteAddr := req.RemoteAddr
+	if forwarded := req.Header.Get("X-Forwarded-For"); forwarded != "" {
+		remoteAddr = strings.TrimSpace(forwarded)
 	}
 
 	wsConn, err := wsh.upgrader.Upgrade(w, req, nil)
 	if err != nil {
 		return
 	}
+	defer wsConn.Close()
 
-	errLog := level.Error(wsh.muxnetwork.log)
-	errLog = kitlog.With(errLog, "remote", remoteAddrStr)
+	errLog := kitlog.With(level.Error(wsh.muxnetwork.log), "remote", remoteAddr)
 
-	var wc net.Conn
-	wc = NewWebsockConn(wsConn)
-
-	cw := wsh.muxnetwork.secretServer.ConnWrapper()
-	wc, err = cw(wc)
+	wc := NewWebsockConn(wsConn)
+	if err := wc.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
+		return
+	}
+	conn, err := wsh.muxnetwork.secretServer.ConnWrapper()(wc)
 	if err != nil {
-		errLog.Log("warning", "failed to authenticate", "err", err, "remote", remoteAddr)
-		wsConn.Close()
+		errLog.Log("warning", "failed to authenticate", "err", err)
+		return
+	}
+	if err := wc.SetDeadline(time.Time{}); err != nil {
 		return
 	}
 
-	// debugging copy of all muxrpc frames
-	// can be handy for reversing applications
-	// feed, err := GetFeedRefFromAddr(wc.RemoteAddr())
-	// if err != nil {
-	// 	errLog.Log("warning", "failed to get feed after auth", "err", err, "remote", remoteAddr)
-	// 	wsConn.Close()
-	// 	return
-	// }
-	// dumpPath := filepath.Join("webmux", base64.URLEncoding.EncodeToString(feed.ID[:10]), remoteAddrStr)
-	// wc, err = debug.WrapDump(dumpPath, wc)
-	// if err != nil {
-	// 	errLog.Log("warning", "failed wrap", "err", err, "remote", remoteAddr)
-	// 	wsConn.Close()
-	// 	return
-	// }
-
-	pkr := muxrpc.NewPacker(wc)
-
-	h, err := wsh.muxnetwork.opts.MakeHandler(wc)
-	if err != nil {
-		err = fmt.Errorf("websocket make handler failed: %w", err)
-		errLog.Log("warn", err)
-		wsConn.Close()
-		return
-	}
-
-	edp := muxrpc.Handle(pkr, h,
-		muxrpc.WithContext(req.Context()),
-		muxrpc.WithRemoteAddr(wc.RemoteAddr()))
-
-	srv := edp.(muxrpc.Server)
-	if err := srv.Serve(); err != nil {
-		errLog.Log("conn", "serve exited", "err", err, "peer", remoteAddr)
-	}
-	wsConn.Close()
+	wsh.muxnetwork.handleConnection(req.Context(), conn, true)
 }
 
 // WebsockConn emulates a normal net.Conn from a websocket connection
@@ -139,31 +106,26 @@ func NewWebsockConn(wsc *websocket.Conn) *WebsockConn {
 }
 
 func (conn *WebsockConn) Read(data []byte) (int, error) {
-	if conn.r == nil {
-		if err := conn.renewReader(); err != nil {
-			return -1, err
+	for {
+		if conn.r == nil {
+			if err := conn.renewReader(); err != nil {
+				return 0, err
+			}
 		}
 
-	}
-
-	n, err := conn.r.Read(data)
-	if err == io.EOF {
-		if err := conn.renewReader(); err != nil {
-			return -1, err
+		n, err := conn.r.Read(data)
+		if err == io.EOF {
+			conn.r = nil
+			if n == 0 {
+				continue
+			}
+			err = nil
 		}
-		n, err = conn.Read(data)
 		if err != nil {
-			err = fmt.Errorf("wsConn: failed to read after renew(): %w", err)
-			return -1, err
+			return n, fmt.Errorf("wsConn: read failed: %w", err)
 		}
 		return n, nil
 	}
-
-	if err != nil {
-		return -1, fmt.Errorf("wsConn: read failed: %w", err)
-	}
-
-	return n, nil
 }
 
 func (conn *WebsockConn) renewReader() error {

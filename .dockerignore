@@ -7,3 +7,6 @@ docker-secrets
 ssb-go-room-secrets
 **/node_modules
 **/*.log
+.env.*
+**/testrun
+dist

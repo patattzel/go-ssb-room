@@ -63,9 +63,9 @@ func (h *Handler) metadata(ctx context.Context, req *muxrpc.Request) (interface{
 	// always-on features
 	reply.Features = []string{
 		"tunnel",
+		"room2",
 		"httpAuth",
 		"httpInvite",
-		// TODO: add "room2" once implemented
 	}
 
 	if pm == roomdb.ModeOpen {

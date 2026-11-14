@@ -6,20 +6,15 @@ SPDX-License-Identifier: CC-BY-4.0
 
 {{ define "title" }}{{i18n "AdminInviteCreatedTitle"}}{{ end }}
 {{ define "content" }}
-    <div class="flex flex-col justify-center items-center self-center max-w-lg">
-      <svg class="mt-6 w-32 h-32 text-green-300" viewBox="0 0 24 24">
-        <path fill="currentColor" d="M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M12 20C7.59 20 4 16.41 4 12S7.59 4 12 4 20 7.59 20 12 16.41 20 12 20M16.59 7.58L10 14.17L7.41 11.59L6 13L10 17L18 9L16.59 7.58Z" />
-      </svg>
-
-      <span
-        id="welcome"
-        class="mt-6 text-center"
-      >{{i18n "AdminInviteCreatedTitle"}}<br />{{i18n "AdminInviteCreatedInstruct"}}</span>
-
-      <a
-        id="invite-facade-link"
-        href="{{.FacadeURL}}"
-        class="mt-6 mb-8 bg-pink-50 w-64 py-1 px-2 break-all text-pink-600 underline"
-        >{{.FacadeURL}}</a>
-    </div>
+<section class="room-flow">
+  <h1>{{i18n "AdminInviteCreatedTitle"}}</h1>
+  <p>{{i18n "AdminInviteCreatedInstruct"}}</p>
+  <div class="room-copy">
+    <input type="text" id="invite-url" aria-label="{{i18n "CopyInviteLink"}}" value="{{.FacadeURL}}" readonly>
+    <button class="room-action room-action-primary" type="button" hidden data-copy-field="invite-url" aria-describedby="invite-copy-status" data-copied="{{i18n "CopySuccess"}}" data-select="{{i18n "CopyManual"}}">{{i18n "CopyInviteLink"}}</button>
+    <output id="invite-copy-status" aria-live="polite"></output>
+  </div>
+  <a class="underline break-all" id="invite-facade-link" href="{{.FacadeURL}}">{{.FacadeURL}}</a>
+  <script src="/assets/copy-field.js" defer></script>
+</section>
 {{end}}

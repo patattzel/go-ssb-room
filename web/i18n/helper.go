@@ -277,7 +277,7 @@ func (l Localizer) LocalizeWithData(messageID string, labelsAndData ...string) t
 	for i := 0; i < n; i += 2 {
 		key := labelsAndData[i]
 		data := labelsAndData[i+1]
-		tplData[key] = data
+		tplData[key] = template.HTMLEscapeString(data)
 	}
 
 	msg, err := l.loc.Localize(&i18n.LocalizeConfig{

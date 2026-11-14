@@ -2,14 +2,20 @@
 #
 # SPDX-License-Identifier: CC0-1.0
 
-version: '3'
 services:
   room:
+    platform: linux/amd64
     build: .
-    command: 'sh start.sh'
-    env_file: .env
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    environment:
+      HTTPS_DOMAIN: ${HTTPS_DOMAIN:?Set HTTPS_DOMAIN in .env}
+      SSB_PORT: ${SSB_PORT:-8008}
     ports:
-      -  "3000:3000" # Proxypass this port through NGINX or Apache as your HTTP landing & dashboard page
-      - "0.0.0.0:8008:8008" # This is the port SSB clients connect to
+      - "127.0.0.1:3000:3000"
+      - "${SSB_PORT:-8008}:8008"
     volumes:
-      - ./ssb-go-room-secrets:/ssb-go-room-secrets
+      - ./ssb-go-room-secrets:/app/data/ssb-go-room

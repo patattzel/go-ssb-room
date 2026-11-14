@@ -33,4 +33,9 @@ func TestMultiserverAddress(t *testing.T) {
 	a.True(strings.HasPrefix(gotMultiAddr, "net:the.ho.st:8008~shs:"), "not for the test host? %s", gotMultiAddr)
 	a.True(strings.HasSuffix(gotMultiAddr, base64.StdEncoding.EncodeToString(sed.RoomID.PubKey())), "public key missing? %s", gotMultiAddr)
 
+	sed.PublicMUXRPCPort = 18008
+	a.Equal("net:the.ho.st:18008~shs:b2hhaW9oYWlvaGFpb2hhaW9oYWlvaGFpb2hhaW9oYWk=", sed.MultiserverAddress())
+
+	sed.PublicWebSocket = "wss://the.ho.st:443"
+	a.Equal("wss://the.ho.st:443~shs:b2hhaW9oYWlvaGFpb2hhaW9oYWlvaGFpb2hhaW9oYWk=", sed.MultiserverAddress())
 }

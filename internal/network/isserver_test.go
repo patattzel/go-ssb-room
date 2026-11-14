@@ -10,12 +10,14 @@ import (
 	"net"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ssbc/go-ssb-room/v2/internal/maybemod/keys"
 	"github.com/ssbc/go-ssb-room/v2/internal/network"
 	"go.mindeco.de/log"
 
 	"github.com/ssbc/go-muxrpc/v2"
+	"github.com/ssbc/go-netwrap"
 
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +25,8 @@ import (
 func TestIsServer(t *testing.T) {
 	r := require.New(t)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	var appkey = make([]byte, 32)
 	rand.Read(appkey)
@@ -56,18 +59,20 @@ func TestIsServer(t *testing.T) {
 	})
 	r.NoError(err)
 
-	go func() {
-		err = server.Serve(ctx)
-		if err != nil {
-			panic(err)
-		}
-	}()
+	served := make(chan error, 1)
+	go func() { served <- server.Serve(ctx) }()
 
-	err = client.Connect(ctx, server.GetListenAddr())
+	addr := server.GetListenAddr()
+	// An unfinished handshake must not hold up the next peer.
+	idle, err := net.DialTimeout("tcp", netwrap.GetAddr(addr, "tcp").String(), time.Second)
+	r.NoError(err)
+	defer idle.Close()
+	err = client.Connect(ctx, addr)
 	r.NoError(err)
 
 	client.Close()
 	server.Close()
+	r.NoError(<-served)
 }
 
 type testHandler struct {

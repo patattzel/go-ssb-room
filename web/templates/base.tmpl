@@ -11,6 +11,7 @@ SPDX-License-Identifier: CC-BY-4.0
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="/assets/fixfouc.css" rel="stylesheet">
   <link href="/assets/style.css" rel="stylesheet">
+  <link href="/assets/room-actions.css" rel="stylesheet">
   <title>{{block "title" .}}Go-SSB Room Server{{end}}</title>
   <!-- generated using https://favicon.io/favicon-converter -->
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicon/apple-touch-icon.png">
@@ -29,7 +30,7 @@ SPDX-License-Identifier: CC-BY-4.0
           <path fill="currentColor" d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z" />
         </svg>
         {{else}}
-        <a href="{{urlTo "admin:menu"}}">
+        <a href="{{urlTo "admin:menu"}}" aria-label="{{i18n "NavAdminDashboard"}}">
           <svg class="w-6 h-6 text-gray-700" viewBox="0 0 24 24">
             <path fill="currentColor" d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z" />
           </svg>
@@ -78,7 +79,7 @@ SPDX-License-Identifier: CC-BY-4.0
         </div>
       {{end}}
 
-      <div class="flex flex-col bg-gray-50 rounded-2xl py-4 px-4 sm:px-8 shadow-xl mb-16 flex-1 max-w-full">
+      <div class="flex flex-col bg-gray-50 rounded-2xl py-4 px-4 sm:px-8 shadow-xl mb-16 flex-1 max-w-full min-w-0">
         {{ block "content" . }}{{end}}
       </div>
     </div>
@@ -126,3 +127,12 @@ SPDX-License-Identifier: CC-BY-4.0
   </div>
 </body>
 </html>
+
+{{define "copy-invite-url"}}
+<script src="/assets/copy-field.js" defer></script>
+<div class="room-copy">
+  <input type="text" id="invite-url" aria-label="{{i18n "CopyInviteLink"}}" value="{{.}}" readonly>
+  <button class="room-action" type="button" hidden data-copy-field="invite-url" aria-describedby="invite-copy-status" data-copied="{{i18n "CopySuccess"}}" data-select="{{i18n "CopyManual"}}">{{i18n "CopyInviteLink"}}</button>
+  <output id="invite-copy-status" aria-live="polite"></output>
+</div>
+{{end}}

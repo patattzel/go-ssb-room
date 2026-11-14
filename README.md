@@ -4,51 +4,36 @@ SPDX-FileCopyrightText: 2021 The NGI Pointer Secure-Scuttlebutt Team of 2020/202
 SPDX-License-Identifier: CC0-1.0
 -->
 
-# Go-SSB Room (Cloudron packaging fork)
-[![REUSE status](https://api.reuse.software/badge/github.com/ssbc/go-ssb-room)](https://api.reuse.software/info/github.com/ssbc/go-ssb-room)
+# SSB Room for Cloudron
 
-This fork packages the upstream [go-ssb-room](https://github.com/ssbc/go-ssb-room) server as a Cloudron app and provides a ready-to-run Docker image. It still contains the full upstream codebase plus Cloudron-specific packaging files.
+Host a Scuttlebutt Rooms 2 server for Manyverse. Create invitations, manage members and choose who can connect from the room dashboard.
 
-- Upstream project: https://github.com/ssbc/go-ssb-room
-- Docker Hub image (example): `pathab/go-ssb-room-cloudron:2.0.7-1`
-- Cloudron packaging tutorial: https://docs.cloudron.io/packaging/tutorial/
+## Install
 
-## What it is
-- Implements the [Room (v1+v2) spec](https://github.com/ssbc/rooms2) in Go.
-- Features: SHS+boxstream transport, muxrpc tunneling, web dashboard, invites, aliases, privacy modes, Sign-in with SSB.
-- Default ports: HTTP dashboard `3000`, muxrpc/shs `8008`.
+Use a Cloudron 10 or later server and the current [Cloudron CLI](https://docs.cloudron.io/packaging/cli/). Run these commands from your computer.
 
-## Install on Cloudron
-1. Use a published image (e.g. `pathab/go-ssb-room-cloudron:2.0.7-1`) **or** build locally:
-   ```bash
-   cloudron build --set-version 2.0.7-1
-   cloudron install --image <tag>
-   ```
-2. Create the first admin:
-   ```bash
-   cloudron exec -- /app/code/insert-user -repo /app/data/ssb-go-room @your-ssb-pubkey
-   ```
-3. Dashboard is proxied by Cloudron; data lives in `/app/data/ssb-go-room`. The SSB muxrpc port is exposed via the manifest tcpPort `SSB_PORT` (defaults to 8008).
+```sh
+git clone https://github.com/patattzel/go-ssb-room.git
+cd go-ssb-room
+cloudron login my.example.com
+cloudron install --location room.example.com
+```
 
-More details: [docs/cloudron.md](./docs/cloudron.md).
+Cloudron builds the image from the checkout and serves the dashboard over HTTPS. The default public SSB port is TCP 8008. Set a different port at install time with `--port-bindings SSB_PORT=18008`, or use `--port-bindings SSB_PORT=x` to connect through secure WebSockets on port 443.
 
-## Quick start with docker-compose (local)
-1. Copy `.env_example` to `.env` and set `HTTPS_DOMAIN`.
-2. Build and start:
-   ```bash
-   docker-compose build room
-   docker-compose up -d
-   ```
-3. Inside the running container, create the first admin:
-   ```bash
-   docker-compose exec room sh
-   /app/cmd/insert-user/insert-user -repo /ssb-go-room-secrets @your-ssb-pubkey
-   exit
-   ```
-4. Dashboard: `http://localhost:3000`, muxrpc: `8008`, data: `./ssb-go-room-secrets`.
+After installation, open the app's **Web Terminal** and run `/app/code/room-admin`. Enter your public Manyverse SSB ID and pick a web password. Open the room site, choose **Sign in → Password sign-in**, and create an invite from the dashboard.
 
-## Development
-See [docs/development.md](./docs/development.md) for hacking on the codebase. Cloudron-specific files are `CloudronManifest.json`, `Dockerfile`, and `start.sh`.
+See [Cloudron operations](docs/cloudron.md) for first setup, backups, updates and troubleshooting. See [development](docs/development.md) for working on the server.
 
-## License
-MIT
+## Run with Docker Compose
+
+Copy `.env_example` to `.env` and set `HTTPS_DOMAIN` to your room hostname. Configure an HTTPS reverse proxy on that host to forward requests to `127.0.0.1:3000`, preserving the Host header and setting `X-Forwarded-Proto: https` and `X-Forwarded-For`. Then run:
+
+```sh
+docker compose up -d --build
+docker compose exec room /app/code/room-admin
+```
+
+The Compose setup exposes the configured TCP SSB port and keeps data in `./ssb-go-room-secrets`. Its image targets Linux AMD64. Docker on ARM hosts needs AMD64 emulation.
+
+The server is based on [go-ssb-room](https://github.com/ssbc/go-ssb-room) and implements the [Rooms 2 protocol](https://github.com/ssbc/rooms2). See [LICENSE](LICENSE).

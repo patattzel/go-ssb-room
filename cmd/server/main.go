@@ -10,6 +10,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"flag"
 	"fmt"
 	"net"
@@ -17,6 +18,8 @@ import (
 	"os/signal"
 	"os/user"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -31,7 +34,6 @@ import (
 	"github.com/unrolled/secure"
 	kitlog "go.mindeco.de/log"
 	"go.mindeco.de/log/level"
-	_ "modernc.org/sqlite"
 
 	"github.com/ssbc/go-ssb-room/v2/internal/network"
 	"github.com/ssbc/go-ssb-room/v2/internal/repo"
@@ -57,6 +59,9 @@ var (
 
 	listenAddrShsMux string
 	listenAddrHTTP   string
+	publicMuxPort    uint
+	webSocketOnly    bool
+	proxyIP          string
 
 	httpsDomain string
 
@@ -96,6 +101,9 @@ func initFlags() {
 
 	flag.StringVar(&listenAddrShsMux, "lismux", ":8008", "address to listen on for secret-handshake+muxrpc")
 	flag.StringVar(&listenAddrHTTP, "lishttp", ":3000", "address to listen on for HTTP requests")
+	flag.UintVar(&publicMuxPort, "public-mux-port", 0, "public port for TCP SSB addresses (defaults to the listener port)")
+	flag.BoolVar(&webSocketOnly, "websocket-only", false, "offer SSB over the web listener only, without a TCP SSB listener")
+	flag.StringVar(&proxyIP, "proxy-ip", "", "if set, only trust forwarded headers from this reverse proxy IP")
 
 	flag.BoolVar(&flagDisableUNIXSock, "nounixsock", false, "disable the UNIX socket RPC interface")
 
@@ -153,6 +161,14 @@ func runroomsrv() error {
 		httpsDomain = "localhost"
 	}
 
+	if publicMuxPort > 65535 || (webSocketOnly && publicMuxPort != 0) {
+		return fmt.Errorf("invalid public muxrpc port for the selected transport")
+	}
+	trustedProxy := net.ParseIP(proxyIP)
+	if proxyIP != "" && trustedProxy == nil {
+		return fmt.Errorf("invalid reverse proxy IP %q", proxyIP)
+	}
+
 	// validate listen addresses to bail out on invalid flag input before doing anything else
 	_, muxrpcPortStr, err := net.SplitHostPort(listenAddrShsMux)
 	if err != nil {
@@ -171,10 +187,10 @@ func runroomsrv() error {
 
 	portHTTP, err := net.LookupPort("tcp", portHTTPStr)
 	if err != nil {
-		return fmt.Errorf("invalid tcp port for muxrpc listener: %w", err)
+		return fmt.Errorf("invalid tcp port for HTTP listener: %w", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	ak, err := base64.StdEncoding.DecodeString(appKey)
@@ -220,7 +236,9 @@ func runroomsrv() error {
 	r := repo.New(repoDir)
 
 	keyPair, err := repo.DefaultKeyPair(r)
-	checkAndLog(err)
+	if err != nil {
+		return err
+	}
 	opts = append(opts, roomsrv.WithKeyPair(keyPair))
 
 	networkInfo := network.ServerEndpointDetails{
@@ -232,8 +250,15 @@ func runroomsrv() error {
 		RoomID: keyPair.Feed,
 
 		ListenAddressMUXRPC: listenAddrShsMux,
+		PublicMUXRPCPort:    publicMuxPort,
 
 		UseSubdomainForAliases: aliasesAsSubdomains,
+	}
+	if webSocketOnly {
+		networkInfo.PublicWebSocket = "wss://" + net.JoinHostPort(httpsDomain, "443")
+		if development {
+			networkInfo.PublicWebSocket = "ws://" + net.JoinHostPort(httpsDomain, strconv.Itoa(portHTTP))
+		}
 	}
 
 	// open the sqlite version of the roomdb
@@ -241,11 +266,14 @@ func runroomsrv() error {
 	if err != nil {
 		return fmt.Errorf("failed to initiate database: %w", err)
 	}
+	defer db.Close()
 
 	bridge := signinwithssb.NewSignalBridge()
 	// the privacy mode flag was passed => update it in the database
 	if privacyMode != roomdb.ModeUnknown {
-		db.Config.SetPrivacyMode(ctx, privacyMode)
+		if err := db.Config.SetPrivacyMode(ctx, privacyMode); err != nil {
+			return err
+		}
 	}
 
 	// create the shs+muxrpc server
@@ -261,6 +289,10 @@ func runroomsrv() error {
 	if err != nil {
 		return fmt.Errorf("failed to instantiate ssb server: %w", err)
 	}
+	defer func() {
+		roomsrv.Shutdown()
+		checkAndLog(roomsrv.Close())
+	}()
 
 	// open the HTTP listener
 	httpLis, err := net.Listen("tcp", listenAddrHTTP)
@@ -268,23 +300,7 @@ func runroomsrv() error {
 		return fmt.Errorf("failed to open listener for HTTPdashboard: %w", err)
 	}
 
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		sig := <-c
-		level.Warn(log).Log("event", "killed", "msg", "received signal, shutting down", "signal", sig.String())
-		cancel()
-		roomsrv.Shutdown()
-
-		httpLis.Close()
-		time.Sleep(2 * time.Second)
-
-		err := roomsrv.Close()
-		checkAndLog(err)
-
-		time.Sleep(2 * time.Second)
-		os.Exit(0)
-	}()
+	defer httpLis.Close()
 
 	// setup web dashboard handlers
 	webHandler, err := handlers.New(
@@ -310,16 +326,21 @@ func runroomsrv() error {
 		return fmt.Errorf("failed to create HTTPdashboard handler: %w", err)
 	}
 
+	domainPattern := regexp.QuoteMeta(httpsDomain)
+	allowedHosts := []string{"(?i)^" + domainPattern + "$"}
+	if aliasesAsSubdomains {
+		allowedHosts = append(allowedHosts, `(?i)^[a-z0-9-]+\.`+domainPattern+"$")
+	}
+	var hostsProxyHeaders []string
+	if trustedProxy == nil {
+		hostsProxyHeaders = []string{"X-Forwarded-Host"}
+	}
+
 	// setup CSP and HTTPS redirects
 	secureMiddleware := secure.New(secure.Options{
 		IsDevelopment: development,
 
-		AllowedHosts: []string{
-			// the normal domain
-			httpsDomain,
-			// the domain but as a wildcard match with *. infront
-			`*\.` + strings.Replace(httpsDomain, ".", `\.`, -1),
-		},
+		AllowedHosts: allowedHosts,
 
 		// for the wildcard matching
 		AllowedHostsAreRegex: true,
@@ -330,7 +351,7 @@ func runroomsrv() error {
 
 		// Important for reverse-proxy setups (when nginx or similar does the TLS termination)
 		SSLProxyHeaders:   map[string]string{"X-Forwarded-Proto": "https"},
-		HostsProxyHeaders: []string{"X-Forwarded-Host"},
+		HostsProxyHeaders: hostsProxyHeaders,
 
 		// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security
 		STSSeconds: 2592000, // 30 days in seconds (TODO configure?)
@@ -341,6 +362,7 @@ func runroomsrv() error {
 		// See for more https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
 		// helpful: https://report-uri.com/home/generate
 		ContentSecurityPolicy: "default-src 'self'; img-src 'self' data:", // enforce no external content
+		ReferrerPolicy:        "same-origin",
 
 		BrowserXssFilter: true,
 		FrameDeny:        true,
@@ -369,54 +391,75 @@ func runroomsrv() error {
 	// wrap dashboard/alias/invite handler in ratlimiter and security middleware
 	var httpHandler http.Handler
 	httpHandler = httpRateLimiter.RateLimit(webHandler)
-	httpHandler = secureMiddleware.Handler(httpHandler)
 	httpHandler = roomsrv.Network.WebsockHandler(httpHandler)
+	httpHandler = secureMiddleware.Handler(httpHandler)
+	if trustedProxy != nil {
+		httpHandler = trustCloudronProxy(trustedProxy, httpHandler)
+	}
+
+	// Cloudron probes the internal HTTP port directly.
+	httpMux := http.NewServeMux()
+	httpMux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet, http.MethodHead:
+		default:
+			w.Header().Set("Allow", "GET, HEAD")
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	httpMux.Handle("/", httpHandler)
 
 	// all init was successfull
 	level.Info(log).Log(
 		"event", "serving",
 		"ID", roomsrv.Whoami().String(),
-		"shsmuxaddr", listenAddrShsMux,
+		"ssb", networkInfo.MultiserverAddress(),
 		"httpaddr", listenAddrHTTP,
 		"version", version, "commit", commit,
 	)
 
-	// start serving http connections
+	srv := http.Server{
+		ReadHeaderTimeout: 15 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      3 * time.Minute, // SSB sign-in uses server-sent events
+		IdleTimeout:       3 * time.Minute,
+		Handler:           httpMux,
+	}
+	httpResult := make(chan error, 1)
 	go func() {
-		srv := http.Server{
-			Addr: httpLis.Addr().String(),
-
-			// Good practice to set timeouts to avoid Slowloris attacks.
-			// Keep in mind that the SSE stuff for "sign-in with ssb" can take a moment, thou
-			ReadHeaderTimeout: time.Second * 15,
-			WriteTimeout:      time.Minute * 3,
-			IdleTimeout:       time.Minute * 3,
-
-			Handler: httpHandler,
-		}
-
-		err = srv.Serve(httpLis)
-		if err != nil {
-			level.Error(log).Log("event", "http serve failed", "err", err)
-		}
+		httpResult <- srv.Serve(httpLis)
 	}()
 
-	// start serving shs+muxrpc connections
-	for {
-		// Note: This is where the serving starts ;)
-		err = roomsrv.Network.Serve(ctx)
-		if err != nil {
-			level.Warn(log).Log("event", "roomsrv node.Serve returned", "err", err)
-		}
-
-		time.Sleep(1 * time.Second)
-		select {
-		case <-ctx.Done():
-			err := roomsrv.Close()
-			return err
-		default:
-		}
+	var ssbResult chan error
+	if !webSocketOnly {
+		ssbResult = make(chan error, 1)
+		go func() {
+			ssbResult <- roomsrv.Network.Serve(ctx)
+		}()
 	}
+
+	select {
+	case err = <-httpResult:
+	case err = <-ssbResult:
+		ssbResult = nil
+	case <-ctx.Done():
+	}
+	cancel()
+	shutdownCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
+	if shutdownErr := srv.Shutdown(shutdownCtx); shutdownErr != nil {
+		srv.Close()
+		checkAndLog(shutdownErr)
+	}
+	if ssbResult != nil {
+		<-ssbResult
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
 }
 
 func main() {
@@ -434,11 +477,33 @@ func (limitByPathAndAddr) Key(r *http.Request) string {
 	k.WriteString(r.URL.Path)
 	k.WriteString("\n")
 
-	remoteIP := r.Header.Get("X-Forwarded-For")
-	if remoteIP == "" {
+	remoteIP, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
 		remoteIP = r.RemoteAddr
+	}
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		remoteIP = forwarded
 	}
 	k.WriteString(remoteIP)
 
 	return k.String()
+}
+
+func trustCloudronProxy(trustedProxy net.IP, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		peer, _, _ := net.SplitHostPort(r.RemoteAddr)
+		if !trustedProxy.Equal(net.ParseIP(peer)) {
+			r.Header.Del("X-Forwarded-Proto")
+			r.Header.Del("X-Forwarded-For")
+		} else {
+			// The proxy appends the address of its client to the forwarding chain.
+			chain := strings.Join(r.Header.Values("X-Forwarded-For"), ",")
+			ip := net.ParseIP(strings.TrimSpace(chain[strings.LastIndex(chain, ",")+1:]))
+			r.Header.Del("X-Forwarded-For")
+			if ip != nil {
+				r.Header.Set("X-Forwarded-For", ip.String())
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }

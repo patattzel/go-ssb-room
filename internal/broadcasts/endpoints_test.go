@@ -25,7 +25,7 @@ func (tp testPrinter) Update(members []string) error {
 
 func (tp testPrinter) Close() error { return nil }
 
-func ExampleBroadcast() {
+func ExampleNewEndpointsEmitter() {
 	sink, bcast := NewEndpointsEmitter()
 	defer sink.Close()
 
@@ -45,7 +45,7 @@ func ExampleBroadcast() {
 	// test: 2
 }
 
-func ExampleBroadcastCanceled() {
+func ExampleNewEndpointsEmitter_canceled() {
 	sink, bcast := NewEndpointsEmitter()
 	defer sink.Close()
 

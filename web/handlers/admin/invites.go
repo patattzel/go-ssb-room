@@ -54,6 +54,7 @@ func (h invitesHandler) overview(rw http.ResponseWriter, req *http.Request) (int
 }
 
 func (h invitesHandler) create(w http.ResponseWriter, req *http.Request) (interface{}, error) {
+	w.Header().Set("Cache-Control", "no-store")
 	if req.Method != "POST" {
 		return nil, weberrors.ErrBadRequest{Where: "HTTP Method", Details: fmt.Errorf("expected POST not %s", req.Method)}
 	}

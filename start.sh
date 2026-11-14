@@ -6,54 +6,37 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+repo="${REPO:-/app/data/ssb-go-room}"
+args=(-dbg= -nounixsock "-repo=${repo}")
 
-if [ -f "${SCRIPT_DIR}/.env" ]; then
-  # Allow local docker-compose/.env based development
-  set -o allexport
-  # shellcheck source=/dev/null
-  . "${SCRIPT_DIR}/.env"
-  set +o allexport
-fi
-
-HTTPS_DOMAIN="${HTTPS_DOMAIN:-${CLOUDRON_APP_DOMAIN:-}}"
-LISTEN_ADDR_HTTP="${LISTEN_ADDR_HTTP:-:3000}"
-LISTEN_ADDR_SHS_MUX="${LISTEN_ADDR_SHS_MUX:-:8008}"
-ALIASES_AS_SUBDOMAINS="${ALIASES_AS_SUBDOMAINS:-false}"
-REPO="${REPO:-/app/data/ssb-go-room}"
-
-if [ -z "${HTTPS_DOMAIN}" ]; then
-  echo "HTTPS_DOMAIN or CLOUDRON_APP_DOMAIN must be set" >&2
-  exit 1
+if [[ -n "${CLOUDRON:-}" ]]; then
+  : "${CLOUDRON_APP_DOMAIN:?Missing Cloudron app domain}"
+  : "${CLOUDRON_PROXY_IP:?Missing Cloudron proxy IP}"
+  if [[ "${repo}" != /app/data/ssb-go-room ]]; then
+    echo 'Cloudron backs up SQLite at /app/data/ssb-go-room/roomdb. Move the existing room data there and remove the REPO override.' >&2
+    exit 1
+  fi
+  args+=("-https-domain=${CLOUDRON_APP_DOMAIN}" "-proxy-ip=${CLOUDRON_PROXY_IP}"
+         -aliases-as-subdomains=false -lishttp=:3000 -lismux=:8008)
+  if [[ -n "${SSB_PORT:-}" ]]; then
+    args+=("-public-mux-port=${SSB_PORT}")
+  else
+    args+=(-websocket-only)
+  fi
+else
+  : "${HTTPS_DOMAIN:?Set HTTPS_DOMAIN to the hostname of your HTTPS reverse proxy}"
+  args+=("-https-domain=${HTTPS_DOMAIN}" "-aliases-as-subdomains=${ALIASES_AS_SUBDOMAINS:-false}"
+         "-lishttp=${LISTEN_ADDR_HTTP:-:3000}" "-lismux=${LISTEN_ADDR_SHS_MUX:-:8008}"
+         "-public-mux-port=${SSB_PORT:-8008}")
 fi
 
 umask 077
-mkdir -p "${REPO}"
-
-# Ensure data dir is writable by cloudron
-chown -R cloudron:cloudron "${REPO}" 2>/dev/null || true
-chown -R cloudron:cloudron /app/data 2>/dev/null || true
-
-SERVER_BIN="${SERVER_BIN:-${SCRIPT_DIR}/server}"
-ALT_SERVER_BIN="${SCRIPT_DIR}/cmd/server/server"
-
-if [ ! -x "${SERVER_BIN}" ] && [ -x "${ALT_SERVER_BIN}" ]; then
-  SERVER_BIN="${ALT_SERVER_BIN}"
-fi
-
-if [ ! -x "${SERVER_BIN}" ]; then
-  echo "server binary not found (looked in ${SERVER_BIN})" >&2
+mkdir -p -- "${repo}"
+if [[ -n "${CLOUDRON:-}" && "$(realpath -- "${repo}")" != "${repo}" ]]; then
+  echo 'The Cloudron room data directory must not be a symbolic link.' >&2
   exit 1
 fi
+chown -R -- cloudron:cloudron "${repo}"
+chmod 0700 -- "${repo}"
 
-RUN_AS="env HOME=/app/data gosu cloudron"
-if ! command -v gosu >/dev/null 2>&1; then
-  RUN_AS=""
-fi
-
-exec ${RUN_AS} "${SERVER_BIN}" \
-  -https-domain="${HTTPS_DOMAIN}" \
-  -repo="${REPO}" \
-  -aliases-as-subdomains="${ALIASES_AS_SUBDOMAINS}" \
-  -lishttp="${LISTEN_ADDR_HTTP}" \
-  -lismux="${LISTEN_ADDR_SHS_MUX}"
+exec gosu cloudron:cloudron /app/code/server "${args[@]}"

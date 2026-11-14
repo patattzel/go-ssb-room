@@ -210,7 +210,8 @@ func TestInvitesCreateAndRevoke(t *testing.T) {
 
 	webassert.Localized(t, doc, []webassert.LocalizedElement{
 		{"title", "AdminInviteCreatedTitle"},
-		{"#welcome", "AdminInviteCreatedTitle" + "AdminInviteCreatedInstruct"},
+		{"h1", "AdminInviteCreatedTitle"},
+		{".room-flow > p", "AdminInviteCreatedInstruct"},
 	})
 
 	wantURL := ts.URLTo(router.CompleteInviteFacade, "token", testInvite)

@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/ssbc/go-muxrpc/v2"
@@ -27,6 +28,8 @@ type ServerEndpointDetails struct {
 	RoomID refs.FeedRef
 
 	ListenAddressMUXRPC string // defaults to ":8008"
+	PublicMUXRPCPort    uint   // 0 uses the listener port
+	PublicWebSocket     string // optional ws(s) URL in place of public TCP
 
 	// Domain sets the DNS name for all the HTTP(S) URLs.
 	Domain    string
@@ -62,15 +65,29 @@ func (sed ServerEndpointDetails) URLForAlias(a string) string {
 	return u.String()
 }
 
-// MultiserverAddress returns net:domain:muxport~shs:roomPubKeyInBase64
-// ie: the room servers https://github.com/ssbc/multiserver-address
+// MultiserverAddress returns the public transport and SHS key used by clients.
 func (sed ServerEndpointDetails) MultiserverAddress() string {
-	addr, err := net.ResolveTCPAddr("tcp", sed.ListenAddressMUXRPC)
-	if err != nil {
-		panic(err)
+	transport := sed.PublicWebSocket
+	if transport == "" {
+		port := sed.PublicMUXRPCPort
+		if port == 0 {
+			port = DefaultPort
+			if sed.ListenAddressMUXRPC != "" {
+				_, listenPort, err := net.SplitHostPort(sed.ListenAddressMUXRPC)
+				if err != nil {
+					panic(err)
+				}
+				resolvedPort, err := net.LookupPort("tcp", listenPort)
+				if err != nil {
+					panic(err)
+				}
+				port = uint(resolvedPort)
+			}
+		}
+		transport = "net:" + net.JoinHostPort(sed.Domain, strconv.Itoa(int(port)))
 	}
-	var roomPubKey = base64.StdEncoding.EncodeToString(sed.RoomID.PubKey())
-	return fmt.Sprintf("net:%s:%d~shs:%s", sed.Domain, addr.Port, roomPubKey)
+	roomPubKey := base64.StdEncoding.EncodeToString(sed.RoomID.PubKey())
+	return transport + "~shs:" + roomPubKey
 }
 
 // EndpointStat gives some information about a connected peer

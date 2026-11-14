@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
+	"time"
 
 	"github.com/ssbc/go-muxrpc/v2"
 	"github.com/ssbc/go-netwrap"
@@ -26,6 +26,8 @@ import (
 
 // DefaultPort is the default listening port for ScuttleButt.
 const DefaultPort = 8008
+
+const handshakeTimeout = 10 * time.Second
 
 type Options struct {
 	Logger log.Logger
@@ -258,68 +260,78 @@ func (n *node) handleConnection(ctx context.Context, origConn net.Conn, isServer
 // Serve starts the network listener and configured resources like local discovery.
 // Canceling the passed context makes the function return. Defers take care of stopping these resources.
 func (n *node) Serve(ctx context.Context, wrappers ...muxrpc.HandlerWrapper) error {
-	// TODO: make multiple listeners (localhost:8008 should not restrict or kill connections)
-	lisWrap := netwrap.NewListenerWrapper(n.secretServer.Addr(), append(n.opts.BefreCryptoWrappers, n.secretServer.ConnWrapper())...)
-	var err error
-
 	n.listenerLock.Lock()
-	n.lis, err = netwrap.Listen(n.opts.ListenAddr, lisWrap)
+	lis, err := net.Listen(n.opts.ListenAddr.Network(), n.opts.ListenAddr.String())
 	if err != nil {
 		n.listenerLock.Unlock()
 		return fmt.Errorf("error creating listener: %w", err)
 	}
-	n.lisClose = sync.Once{} // reset once
+	n.lis = lis
+	n.lisClose = sync.Once{}
 	close(n.listening)
 	n.listenerLock.Unlock()
 
-	defer func() { // refresh listener to re-call
-		n.lisClose.Do(func() {
-			n.listenerLock.Lock()
-			n.lis.Close()
-			n.lis = nil
-			n.listenerLock.Unlock()
-		})
+	stop := context.AfterFunc(ctx, func() { lis.Close() })
+	defer stop()
+	defer func() {
+		n.listenerLock.Lock()
+		defer n.listenerLock.Unlock()
+		n.lisClose.Do(func() { lis.Close() })
+		n.lis = nil
 		n.listening = make(chan struct{})
 	}()
 
-	// accept in a goroutine so that we can react to context cancel and close the listener
-	newConn := make(chan net.Conn)
-	go func() {
-		defer close(newConn)
-		for {
-			n.listenerLock.Lock()
-			if n.lis == nil {
-				n.listenerLock.Unlock()
-				return
-			}
-			n.listenerLock.Unlock()
-			conn, err := n.lis.Accept()
-			if err != nil {
-				if strings.Contains(err.Error(), "use of closed network connection") {
-					// yikes way of handling this
-					// but means this needs to be restarted anyway
-					return
-				}
-
-				continue
-			}
-
-			newConn <- conn
-		}
-	}()
-
+	// Keep slow or incomplete handshakes off the accept loop.
+	pending := make(chan struct{}, 64)
 	defer level.Debug(n.log).Log("event", "network listen loop exited")
 	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case conn := <-newConn:
-			if conn == nil {
+		conn, err := lis.Accept()
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if errors.Is(err, net.ErrClosed) {
 				return nil
 			}
-			go n.handleConnection(ctx, conn, true, wrappers...)
+			return err
+		}
+		select {
+		case pending <- struct{}{}:
+			go func() {
+				secured, err := n.authenticateIncoming(ctx, conn)
+				<-pending
+				if err != nil {
+					conn.Close()
+					level.Debug(n.log).Log("event", "SSB handshake failed", "err", err)
+					return
+				}
+				n.handleConnection(ctx, secured, true, wrappers...)
+			}()
+		default:
+			conn.Close()
 		}
 	}
+}
+
+func (n *node) authenticateIncoming(ctx context.Context, conn net.Conn) (net.Conn, error) {
+	stop := context.AfterFunc(ctx, func() { conn.Close() })
+	defer stop()
+	if err := conn.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
+		return nil, err
+	}
+	wrapped := conn
+	for _, wrap := range n.beforeCryptoConnWrappers {
+		var err error
+		wrapped, err = wrap(wrapped)
+		if err != nil {
+			return nil, err
+		}
+	}
+	secured, err := n.secretServer.ConnWrapper()(wrapped)
+	if err != nil {
+		return nil, err
+	}
+	return secured, conn.SetDeadline(time.Time{})
 }
 
 func (n *node) Connect(ctx context.Context, addr net.Addr) error {
@@ -357,9 +369,15 @@ func (n *node) Connect(ctx context.Context, addr net.Addr) error {
 
 // GetListenAddr waits for Serve() to be called!
 func (n *node) GetListenAddr() net.Addr {
-	_, ok := <-n.listening
-	if !ok {
-		return n.lis.Addr()
+	n.listenerLock.Lock()
+	listening := n.listening
+	n.listenerLock.Unlock()
+	<-listening
+
+	n.listenerLock.Lock()
+	defer n.listenerLock.Unlock()
+	if n.lis != nil {
+		return netwrap.WrapAddr(n.lis.Addr(), n.secretServer.Addr())
 	}
 	level.Error(n.log).Log("msg", "listener not ready")
 	return nil
@@ -390,7 +408,7 @@ func (n *node) Close() error {
 		n.lisClose.Do(func() {
 			closeErr = n.lis.Close()
 		})
-		if closeErr != nil && !strings.Contains(closeErr.Error(), "use of closed network connection") {
+		if closeErr != nil && !errors.Is(closeErr, net.ErrClosed) {
 			return fmt.Errorf("ssb: network node failed to close it's listener: %w", closeErr)
 		}
 	}
