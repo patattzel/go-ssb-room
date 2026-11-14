@@ -5,6 +5,12 @@
 name: Publish Cloudron image
 
 on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing Cloudron release tag
+        required: true
+        type: string
   push:
     tags: ['cloudron-v*']
 
@@ -17,14 +23,17 @@ jobs:
     runs-on: ubuntu-latest
     env:
       IMAGE: ghcr.io/${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
 
       - name: Validate release version
         id: version
         run: |
           version="$(jq -er .version CloudronManifest.json)"
-          test "${GITHUB_REF_NAME}" = "cloudron-v${version}"
+          test "${RELEASE_TAG}" = "cloudron-v${version}"
           echo "tag=${version}" >> "${GITHUB_OUTPUT}"
 
       - name: Build Linux AMD64 image
@@ -33,7 +42,7 @@ jobs:
         run: |
           docker build --platform linux/amd64 \
             --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
-            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" \
             --label "org.opencontainers.image.version=${VERSION}" \
             --tag "${IMAGE}:${VERSION}" .
 
