@@ -28,6 +28,9 @@ else
   args+=("-https-domain=${HTTPS_DOMAIN}" "-aliases-as-subdomains=${ALIASES_AS_SUBDOMAINS:-false}"
          "-lishttp=${LISTEN_ADDR_HTTP:-:3000}" "-lismux=${LISTEN_ADDR_SHS_MUX:-:8008}"
          "-public-mux-port=${SSB_PORT:-8008}")
+  if [[ -n "${PROXY_IP:-}" ]]; then
+    args+=("-proxy-ip=${PROXY_IP}")
+  fi
 fi
 
 umask 077

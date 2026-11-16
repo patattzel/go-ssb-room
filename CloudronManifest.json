@@ -3,7 +3,7 @@
   "title": "SSB Room",
   "tagline": "Moderated Scuttlebutt room server",
   "description": "Host a Scuttlebutt room for Manyverse and other Rooms 2 clients. Manage invitations, members, privacy and aliases in the browser.",
-  "version": "2.0.7-4",
+  "version": "2.0.7-5",
   "upstreamVersion": "2.0.7",
   "minBoxVersion": "10.0.0",
   "healthCheckPath": "/healthz",
@@ -35,6 +35,6 @@
   "mediaLinks": [
     "https://raw.githubusercontent.com/patattzel/go-ssb-room/cloudron-v2.0.7-2/docs/screenshots/dashboard.png"
   ],
-  "changelog": "* Default to secure WebSockets over port 443 for new dashboard installations, including behind Cloudflare.\n* Direct SSB TCP remains available as an optional port binding.",
+  "changelog": "* Require POST with CSRF protection to revoke invitations or remove blocked keys.\n* Rate-limit WebSocket upgrades per client IP and cap concurrent handshakes.",
   "tags": ["chat", "sync", "hosting"]
 }

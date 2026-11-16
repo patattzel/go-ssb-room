@@ -25,8 +25,9 @@ import (
 // if the websocket upgrade is successfull.
 func (n *node) WebsockHandler(next http.Handler) http.Handler {
 	var upgrader = websocket.Upgrader{
-		ReadBufferSize:  1024 * 4,
-		WriteBufferSize: 1024 * 4,
+		HandshakeTimeout: handshakeTimeout,
+		ReadBufferSize:   1024 * 4,
+		WriteBufferSize:  1024 * 4,
 
 		CheckOrigin: func(_ *http.Request) bool {
 			return true
@@ -46,6 +47,7 @@ func (n *node) WebsockHandler(next http.Handler) http.Handler {
 	wsh.next = next
 	wsh.upgrader = &upgrader
 	wsh.muxnetwork = n
+	wsh.pending = make(chan struct{}, maxPendingHandshakes)
 
 	return wsh
 }
@@ -56,12 +58,29 @@ type websocketHandelr struct {
 	muxnetwork *node
 
 	upgrader *websocket.Upgrader
+	pending  chan struct{}
 }
 
 func (wsh websocketHandelr) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !websocket.IsWebSocketUpgrade(req) {
 		wsh.next.ServeHTTP(w, req)
 		return
+	}
+
+	conn, wsConn := wsh.upgradeAndAuthenticate(w, req)
+	if conn != nil {
+		defer wsConn.Close()
+		wsh.muxnetwork.handleConnection(req.Context(), conn, true)
+	}
+}
+
+func (wsh websocketHandelr) upgradeAndAuthenticate(w http.ResponseWriter, req *http.Request) (net.Conn, *websocket.Conn) {
+	select {
+	case wsh.pending <- struct{}{}:
+		defer func() { <-wsh.pending }()
+	default:
+		http.Error(w, "too many pending WebSocket handshakes", http.StatusServiceUnavailable)
+		return nil, nil
 	}
 
 	remoteAddr := req.RemoteAddr
@@ -71,26 +90,32 @@ func (wsh websocketHandelr) ServeHTTP(w http.ResponseWriter, req *http.Request) 
 
 	wsConn, err := wsh.upgrader.Upgrade(w, req, nil)
 	if err != nil {
-		return
+		return nil, nil
 	}
-	defer wsConn.Close()
+	authenticated := false
+	defer func() {
+		if !authenticated {
+			wsConn.Close()
+		}
+	}()
 
 	errLog := kitlog.With(level.Error(wsh.muxnetwork.log), "remote", remoteAddr)
 
 	wc := NewWebsockConn(wsConn)
 	if err := wc.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
-		return
+		return nil, nil
 	}
 	conn, err := wsh.muxnetwork.secretServer.ConnWrapper()(wc)
 	if err != nil {
 		errLog.Log("warning", "failed to authenticate", "err", err)
-		return
+		return nil, nil
 	}
 	if err := wc.SetDeadline(time.Time{}); err != nil {
-		return
+		return nil, nil
 	}
 
-	wsh.muxnetwork.handleConnection(req.Context(), conn, true)
+	authenticated = true
+	return conn, wsConn
 }
 
 // WebsockConn emulates a normal net.Conn from a websocket connection

@@ -87,8 +87,9 @@ webserver.
 
 * `X-Forwarded-Host` as which domain name the room is running (enforce strict TLS checking)
 * `X-Forwarded-Proto` to ensure that TLS is used (and redirect if necessary)
-* `X-Forwarded-For` the remote TCP/IP address of the client accessing the room (used for rate
-  limiting)
+* `X-Forwarded-For` the client IP address, without its port. Set `-proxy-ip` to the
+  reverse proxy's IP as seen by the room server to rate-limit by client IP. Configure the proxy
+  to overwrite the header or append the actual client IP at the end of the list.
 
 [example-nginx.conf](./files/example-nginx.conf) contains an [nginx](https://nginx.org) config that
 we use for [hermies.club](https://hermies.club). To get a wildcard TLS certificate you can

@@ -63,8 +63,7 @@ type Databases struct {
 	PinnedNotices roomdb.PinnedNoticesService
 }
 
-// Handler supplies the elevated access pages to known users.
-// It is not registering on the mux router like other pages to clean up the authorize flow.
+// Handler supplies the dashboard pages behind the membership middleware.
 func Handler(
 	netInfo network.ServerEndpointDetails,
 	r *render.Renderer,
@@ -73,7 +72,7 @@ func Handler(
 	locHelper *i18n.Helper,
 	dbs Databases,
 ) http.Handler {
-	mux := &http.ServeMux{}
+	mux := router.Admin(nil)
 
 	urlTo := web.NewURLTo(router.CompleteApp(), netInfo)
 
@@ -85,7 +84,7 @@ func Handler(
 		dbs:       dbs,
 		roomState: roomState,
 	}
-	mux.HandleFunc("/dashboard", r.HTML("admin/dashboard.tmpl", dashboardHandler.overview))
+	mux.Get(router.AdminDashboard).HandlerFunc(r.HTML("admin/dashboard.tmpl", dashboardHandler.overview))
 
 	var sh = settingsHandler{
 		r:     r,
@@ -93,11 +92,11 @@ func Handler(
 		db:    dbs.Config,
 		loc:   locHelper,
 	}
-	mux.HandleFunc("/settings", r.HTML("admin/settings.tmpl", sh.overview))
-	mux.HandleFunc("/settings/set-privacy", sh.setPrivacy)
-	mux.HandleFunc("/settings/set-language", sh.setLanguage)
+	mux.Get(router.AdminSettings).HandlerFunc(r.HTML("admin/settings.tmpl", sh.overview))
+	mux.Get(router.AdminSettingsSetPrivacy).HandlerFunc(sh.setPrivacy)
+	mux.Get(router.AdminSettingsSetLanguage).HandlerFunc(sh.setLanguage)
 
-	mux.HandleFunc("/menu", r.HTML("admin/menu.tmpl", func(w http.ResponseWriter, req *http.Request) (interface{}, error) {
+	mux.Get(router.AdminMenu).HandlerFunc(r.HTML("admin/menu.tmpl", func(w http.ResponseWriter, req *http.Request) (interface{}, error) {
 		return map[string]interface{}{}, nil
 	}))
 
@@ -107,8 +106,8 @@ func Handler(
 
 		db: dbs.Aliases,
 	}
-	mux.HandleFunc("/aliases/revoke/confirm", r.HTML("admin/aliases-revoke-confirm.tmpl", ah.revokeConfirm))
-	mux.HandleFunc("/aliases/revoke", ah.revoke)
+	mux.Get(router.AdminAliasesRevokeConfirm).HandlerFunc(r.HTML("admin/aliases-revoke-confirm.tmpl", ah.revokeConfirm))
+	mux.Get(router.AdminAliasesRevoke).HandlerFunc(ah.revoke)
 
 	var dh = deniedKeysHandler{
 		r:       r,
@@ -118,10 +117,10 @@ func Handler(
 
 		roomCfg: dbs.Config,
 	}
-	mux.HandleFunc("/denied", r.HTML("admin/denied-keys.tmpl", dh.overview))
-	mux.HandleFunc("/denied/add", dh.add)
-	mux.HandleFunc("/denied/remove/confirm", r.HTML("admin/denied-keys-remove-confirm.tmpl", dh.removeConfirm))
-	mux.HandleFunc("/denied/remove", dh.remove)
+	mux.Get(router.AdminDeniedKeysOverview).HandlerFunc(r.HTML("admin/denied-keys.tmpl", dh.overview))
+	mux.Get(router.AdminDeniedKeysAdd).HandlerFunc(dh.add)
+	mux.Get(router.AdminDeniedKeysRemoveConfirm).HandlerFunc(r.HTML("admin/denied-keys-remove-confirm.tmpl", dh.removeConfirm))
+	mux.Get(router.AdminDeniedKeysRemove).HandlerFunc(dh.remove)
 
 	var mh = membersHandler{
 		r:       r,
@@ -134,13 +133,13 @@ func Handler(
 		fallbackAuthDB: dbs.AuthFallback,
 		roomCfgDB:      dbs.Config,
 	}
-	mux.HandleFunc("/member", r.HTML("admin/member.tmpl", mh.details))
-	mux.HandleFunc("/members", r.HTML("admin/member-list.tmpl", mh.overview))
-	mux.HandleFunc("/members/add", mh.add)
-	mux.HandleFunc("/members/change-role", mh.changeRole)
-	mux.HandleFunc("/members/remove/confirm", r.HTML("admin/members-remove-confirm.tmpl", mh.removeConfirm))
-	mux.HandleFunc("/members/remove", mh.remove)
-	mux.HandleFunc("/members/create-fallback-reset-link", r.HTML("admin/members-show-password-reset-token.tmpl", mh.createPasswordResetToken))
+	mux.Get(router.AdminMemberDetails).HandlerFunc(r.HTML("admin/member.tmpl", mh.details))
+	mux.Get(router.AdminMembersOverview).HandlerFunc(r.HTML("admin/member-list.tmpl", mh.overview))
+	mux.Get(router.AdminMembersAdd).HandlerFunc(mh.add)
+	mux.Get(router.AdminMembersChangeRole).HandlerFunc(mh.changeRole)
+	mux.Get(router.AdminMembersRemoveConfirm).HandlerFunc(r.HTML("admin/members-remove-confirm.tmpl", mh.removeConfirm))
+	mux.Get(router.AdminMembersRemove).HandlerFunc(mh.remove)
+	mux.Get(router.AdminMembersCreateFallbackReset).HandlerFunc(r.HTML("admin/members-show-password-reset-token.tmpl", mh.createPasswordResetToken))
 
 	var ih = invitesHandler{
 		r:       r,
@@ -151,10 +150,10 @@ func Handler(
 		config: dbs.Config,
 	}
 
-	mux.HandleFunc("/invites", r.HTML("admin/invite-list.tmpl", ih.overview))
-	mux.HandleFunc("/invites/create", r.HTML("admin/invite-created.tmpl", ih.create))
-	mux.HandleFunc("/invites/revoke/confirm", r.HTML("admin/invite-revoke-confirm.tmpl", ih.revokeConfirm))
-	mux.HandleFunc("/invites/revoke", ih.revoke)
+	mux.Get(router.AdminInvitesOverview).HandlerFunc(r.HTML("admin/invite-list.tmpl", ih.overview))
+	mux.Get(router.AdminInvitesCreate).HandlerFunc(r.HTML("admin/invite-created.tmpl", ih.create))
+	mux.Get(router.AdminInvitesRevokeConfirm).HandlerFunc(r.HTML("admin/invite-revoke-confirm.tmpl", ih.revokeConfirm))
+	mux.Get(router.AdminInvitesRevoke).HandlerFunc(ih.revoke)
 
 	var nh = noticeHandler{
 		r:       r,
@@ -165,15 +164,14 @@ func Handler(
 		pinnedDB: dbs.PinnedNotices,
 		roomCfg:  dbs.Config,
 	}
-	mux.Handle("/notice/edit", r.HTML("admin/notice-edit.tmpl", nh.edit))
-	mux.Handle("/notice/translation/draft", r.HTML("admin/notice-edit.tmpl", nh.draftTranslation))
-	mux.Handle("/notice/translation/add", http.HandlerFunc(nh.addTranslation))
-	mux.Handle("/notice/save", http.HandlerFunc(nh.save))
+	mux.Get(router.AdminNoticeEdit).HandlerFunc(r.HTML("admin/notice-edit.tmpl", nh.edit))
+	mux.Get(router.AdminNoticeDraftTranslation).HandlerFunc(r.HTML("admin/notice-edit.tmpl", nh.draftTranslation))
+	mux.Get(router.AdminNoticeAddTranslation).HandlerFunc(nh.addTranslation)
+	mux.Get(router.AdminNoticeSave).HandlerFunc(nh.save)
 
-	// path:/ matches everything that isn't registerd (ie. its the "Not Found handler")
-	mux.HandleFunc("/", http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		r.Error(rw, req, 404, weberrors.PageNotFound{Path: req.URL.Path})
-	}))
+	mux.NotFoundHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		r.Error(rw, req, http.StatusNotFound, weberrors.PageNotFound{Path: req.URL.Path})
+	})
 
 	return customStripPrefix("/admin", mux)
 }
@@ -184,6 +182,7 @@ const defaultPageSize = 20
 // paginate receives the total slice and it's length/count, a URL query for the 'limit' and which 'page'.
 //
 // The members of the map are:
+//
 //	Entries: the paginated slice
 //	Count: the total number of the whole, unpaginated list
 //	FirstInView: a bool thats true if you render the first page
@@ -191,7 +190,8 @@ const defaultPageSize = 20
 //	Paginator and View: helpers for rendering the page accessor (see github.com/vcraescu/go-paginator)
 //
 // TODO: we could return a struct instead but then need to re-think how we embedd it into all the pages where we need it.
-//  Maybe renderData["Pages"] = paginatedData
+//
+//	Maybe renderData["Pages"] = paginatedData
 func paginate(total interface{}, count int, qry url.Values) (map[string]interface{}, error) {
 	pageSize, err := strconv.Atoi(qry.Get("limit"))
 	if err != nil {

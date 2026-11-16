@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -48,6 +49,51 @@ func TestRestricted(t *testing.T) {
 		found := html.Find("h1").Text()
 		a.Equal("Error #403 - Forbidden", found, "wrong error message code for %q", turl)
 	}
+}
+
+func TestAdminMutationsRequirePostAndCSRF(t *testing.T) {
+	ts := setup(t)
+	ts.AuthWithSSB.CheckTokenReturns(23, nil)
+	ts.MembersDB.GetByIDReturns(roomdb.Member{ID: 23, Role: roomdb.RoleAdmin}, nil)
+
+	_, resp := ts.Client.GetHTML(ts.URLTo(router.AuthWithSSBFinalize, "token", "session-token"))
+	require.Equal(t, http.StatusTemporaryRedirect, resp.Code)
+
+	for _, route := range []string{router.AdminDeniedKeysRemove, router.AdminInvitesRevoke} {
+		target := ts.URLTo(route, "id", 23)
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			req := httptest.NewRequest(method, target.String(), nil)
+			for _, cookie := range resp.Result().Cookies() {
+				req.AddCookie(cookie)
+			}
+			rec := httptest.NewRecorder()
+			ts.Mux.ServeHTTP(rec, req)
+			require.Equal(t, http.StatusMethodNotAllowed, rec.Code, "%s %s", method, target.Path)
+		}
+
+		ts.Client.SetHeaders(http.Header{"Origin": {"https://localhost"}})
+		rejected := ts.Client.PostForm(target, url.Values{})
+		require.Equal(t, http.StatusForbidden, rejected.Code)
+	}
+
+	require.Zero(t, ts.DeniedKeysDB.RemoveIDCallCount())
+	require.Zero(t, ts.InvitesDB.RevokeCallCount())
+
+	doc, resp := ts.Client.GetHTML(ts.URLTo(router.AuthFallbackLogin))
+	require.Equal(t, http.StatusOK, resp.Code)
+	field := doc.Find("#password-fallback input[type=hidden]")
+	name, ok := field.Attr("name")
+	require.True(t, ok)
+	token, ok := field.Attr("value")
+	require.True(t, ok)
+
+	for _, route := range []string{router.AdminDeniedKeysRemove, router.AdminInvitesRevoke} {
+		target := ts.URLTo(route)
+		rec := ts.Client.PostForm(target, url.Values{name: {token}, "id": {"23"}})
+		require.Equal(t, http.StatusSeeOther, rec.Code)
+	}
+	require.Equal(t, 1, ts.DeniedKeysDB.RemoveIDCallCount())
+	require.Equal(t, 1, ts.InvitesDB.RevokeCallCount())
 }
 
 func TestLoginForm(t *testing.T) {

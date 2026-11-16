@@ -27,7 +27,10 @@ import (
 // DefaultPort is the default listening port for ScuttleButt.
 const DefaultPort = 8008
 
-const handshakeTimeout = 10 * time.Second
+const (
+	handshakeTimeout     = 10 * time.Second
+	maxPendingHandshakes = 64
+)
 
 type Options struct {
 	Logger log.Logger
@@ -282,7 +285,7 @@ func (n *node) Serve(ctx context.Context, wrappers ...muxrpc.HandlerWrapper) err
 	}()
 
 	// Keep slow or incomplete handshakes off the accept loop.
-	pending := make(chan struct{}, 64)
+	pending := make(chan struct{}, maxPendingHandshakes)
 	defer level.Debug(n.log).Log("event", "network listen loop exited")
 	for {
 		conn, err := lis.Accept()

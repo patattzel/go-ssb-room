@@ -31,6 +31,8 @@ docker compose up -d --build
 docker compose exec room /app/code/room-admin
 ```
 
+Set `PROXY_IP` in `.env` to the reverse proxy's IP as seen by the room container to rate-limit by client IP. The proxy must append the actual client address to `X-Forwarded-For` or overwrite that header. Without `PROXY_IP`, requests share the proxy's IP for rate limiting.
+
 The Compose setup exposes the configured TCP SSB port and keeps data in `./ssb-go-room-secrets`. Its image targets Linux AMD64. Docker on ARM hosts needs AMD64 emulation.
 
 The server is based on [go-ssb-room](https://github.com/ssbc/go-ssb-room) and implements the [Rooms 2 protocol](https://github.com/ssbc/rooms2). See [LICENSE](LICENSE).

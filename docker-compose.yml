@@ -13,6 +13,7 @@ services:
       - /run
     environment:
       HTTPS_DOMAIN: ${HTTPS_DOMAIN:?Set HTTPS_DOMAIN in .env}
+      PROXY_IP: ${PROXY_IP:-}
       SSB_PORT: ${SSB_PORT:-8008}
     ports:
       - "127.0.0.1:3000:3000"

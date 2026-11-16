@@ -28,6 +28,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/gorilla/websocket"
 	"github.com/ssbc/go-muxrpc/v2/debug"
 	"github.com/throttled/throttled/v2"
 	"github.com/throttled/throttled/v2/store/memstore"
@@ -369,29 +370,11 @@ func runroomsrv() error {
 		//ContentTypeNosniff: true, // TODO: fix Content-Type headers served from assets
 	})
 
-	// HTTP rate limiter
-	throttleStore, err := memstore.New(65536) // 64k different combinations of limitByPathAndAddr
+	// Rate-limit upgrade requests before the WebSocket handler can hijack the connection.
+	httpHandler, err := rateLimitHTTP(roomsrv.Network.WebsockHandler(webHandler), trustedProxy != nil)
 	if err != nil {
-		return fmt.Errorf("failed to init HTTP rate limiter store: %w", err)
+		return err
 	}
-	quota := throttled.RateQuota{
-		MaxRate:  throttled.PerSec(5), // different requests per second per VaryBy
-		MaxBurst: 25,
-	}
-	limiter, err := throttled.NewGCRARateLimiter(throttleStore, quota)
-	if err != nil {
-		return fmt.Errorf("failed to init HTTP rate limiter: %w", err)
-	}
-
-	httpRateLimiter := throttled.HTTPRateLimiter{
-		RateLimiter: limiter,
-		VaryBy:      limitByPathAndAddr{},
-	}
-
-	// wrap dashboard/alias/invite handler in ratlimiter and security middleware
-	var httpHandler http.Handler
-	httpHandler = httpRateLimiter.RateLimit(webHandler)
-	httpHandler = roomsrv.Network.WebsockHandler(httpHandler)
 	httpHandler = secureMiddleware.Handler(httpHandler)
 	if trustedProxy != nil {
 		httpHandler = trustCloudronProxy(trustedProxy, httpHandler)
@@ -469,24 +452,45 @@ func main() {
 	}
 }
 
-type limitByPathAndAddr struct{}
+func rateLimitHTTP(next http.Handler, trustForwardedFor bool) (http.Handler, error) {
+	store, err := memstore.New(65536)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init HTTP rate limiter store: %w", err)
+	}
+	limiter, err := throttled.NewGCRARateLimiter(store, throttled.RateQuota{
+		MaxRate:  throttled.PerSec(5),
+		MaxBurst: 25,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to init HTTP rate limiter: %w", err)
+	}
+	httpLimiter := throttled.HTTPRateLimiter{
+		RateLimiter: limiter,
+		VaryBy:      limitByPathAndAddr{trustForwardedFor: trustForwardedFor},
+	}
+	return httpLimiter.RateLimit(next), nil
+}
 
-func (limitByPathAndAddr) Key(r *http.Request) string {
-	var k strings.Builder
+type limitByPathAndAddr struct {
+	trustForwardedFor bool
+}
 
-	k.WriteString(r.URL.Path)
-	k.WriteString("\n")
-
+func (l limitByPathAndAddr) Key(r *http.Request) string {
+	path := r.URL.Path
+	if websocket.IsWebSocketUpgrade(r) {
+		path = "websocket" // All upgrade requests from this IP share one bucket.
+	}
 	remoteIP, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		remoteIP = r.RemoteAddr
 	}
-	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-		remoteIP = forwarded
+	if l.trustForwardedFor {
+		// The proxy middleware has already discarded untrusted forwarding headers.
+		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+			remoteIP = forwarded
+		}
 	}
-	k.WriteString(remoteIP)
-
-	return k.String()
+	return path + "\n" + remoteIP
 }
 
 func trustCloudronProxy(trustedProxy net.IP, next http.Handler) http.Handler {
